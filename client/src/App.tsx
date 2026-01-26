@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -92,12 +92,14 @@ function AdminRoutes() {
 }
 
 function Router() {
-  return (
-    <Switch>
-      <Route path="/admin/:rest*" component={AdminRoutes} />
-      <Route component={PublicRoutes} />
-    </Switch>
-  );
+  const [location] = useLocation();
+  
+  // Check if we're on an admin route
+  if (location.startsWith("/admin")) {
+    return <AdminRoutes />;
+  }
+  
+  return <PublicRoutes />;
 }
 
 function App() {
