@@ -79,8 +79,8 @@ export interface IStorage {
   updateLocationInventory(locationId: string, productId: string, delta: number): Promise<void>;
 
   // Orders
-  getOrders(): Promise<(Order & { location: Location; items: (OrderItem & { product: Product })[] })[]>;
-  getOrder(id: string): Promise<(Order & { location: Location; items: (OrderItem & { product: Product })[] }) | undefined>;
+  getOrders(): Promise<(Order & { location?: Location; items: (OrderItem & { product: Product })[] })[]>;
+  getOrder(id: string): Promise<(Order & { location?: Location; items: (OrderItem & { product: Product })[] }) | undefined>;
   createOrder(data: InsertOrder): Promise<Order>;
   updateOrder(id: string, data: Partial<InsertOrder>): Promise<Order | undefined>;
   updateOrderStatus(id: string, status: string): Promise<Order | undefined>;
@@ -306,11 +306,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Orders
-  async getOrders(): Promise<(Order & { location: Location; items: (OrderItem & { product: Product })[] })[]> {
+  async getOrders(): Promise<(Order & { location?: Location; items: (OrderItem & { product: Product })[] })[]> {
     const allOrders = await db
       .select()
       .from(orders)
-      .innerJoin(locations, eq(orders.locationId, locations.id))
+      .leftJoin(locations, eq(orders.locationId, locations.id))
       .orderBy(desc(orders.createdAt));
     
     const result = [];
@@ -323,7 +323,7 @@ export class DatabaseStorage implements IStorage {
       
       result.push({
         ...row.orders,
-        location: row.locations,
+        location: row.locations || undefined,
         items: items.map((itemRow) => ({
           ...itemRow.order_items,
           product: itemRow.products,
@@ -334,11 +334,11 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getOrder(id: string): Promise<(Order & { location: Location; items: (OrderItem & { product: Product })[] }) | undefined> {
+  async getOrder(id: string): Promise<(Order & { location?: Location; items: (OrderItem & { product: Product })[] }) | undefined> {
     const [row] = await db
       .select()
       .from(orders)
-      .innerJoin(locations, eq(orders.locationId, locations.id))
+      .leftJoin(locations, eq(orders.locationId, locations.id))
       .where(eq(orders.id, id));
     
     if (!row) return undefined;
@@ -351,7 +351,7 @@ export class DatabaseStorage implements IStorage {
     
     return {
       ...row.orders,
-      location: row.locations,
+      location: row.locations || undefined,
       items: items.map((itemRow) => ({
         ...itemRow.order_items,
         product: itemRow.products,

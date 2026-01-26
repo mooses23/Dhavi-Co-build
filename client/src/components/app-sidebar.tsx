@@ -19,6 +19,7 @@ import {
   Factory,
   LayoutDashboard,
   Image,
+  FileText,
   LogOut,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -34,6 +35,11 @@ const menuItems = [
     title: "Orders",
     url: "/admin/orders",
     icon: ShoppingCart,
+  },
+  {
+    title: "Invoices",
+    url: "/admin/invoices",
+    icon: FileText,
   },
   {
     title: "Production",

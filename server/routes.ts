@@ -15,7 +15,11 @@ const orderCreateSchema = z.object({
   customerName: z.string().min(1),
   customerEmail: z.string().email(),
   customerPhone: z.string().optional(),
-  locationId: z.string().min(1),
+  deliveryAddress: z.string().min(5),
+  deliveryCity: z.string().min(2),
+  deliveryState: z.string().min(2),
+  deliveryZip: z.string().min(5),
+  deliveryInstructions: z.string().optional(),
   fulfillmentDate: z.string(),
   fulfillmentWindow: z.string(),
   items: z.array(z.object({
@@ -87,17 +91,15 @@ export async function registerRoutes(
         customerName,
         customerEmail,
         customerPhone,
-        locationId,
+        deliveryAddress,
+        deliveryCity,
+        deliveryState,
+        deliveryZip,
+        deliveryInstructions,
         fulfillmentDate,
         fulfillmentWindow,
         items,
       } = parseResult.data;
-
-      // Validate location exists and is active
-      const location = await storage.getLocation(locationId);
-      if (!location || !location.isActive) {
-        return res.status(400).json({ message: "Invalid or inactive location" });
-      }
 
       // Calculate totals
       let subtotal = 0;
@@ -135,7 +137,11 @@ export async function registerRoutes(
         customerName,
         customerEmail,
         customerPhone,
-        locationId,
+        deliveryAddress,
+        deliveryCity,
+        deliveryState,
+        deliveryZip,
+        deliveryInstructions,
         fulfillmentDate: new Date(fulfillmentDate),
         fulfillmentWindow,
         subtotal: subtotal.toFixed(2),
@@ -177,7 +183,10 @@ export async function registerRoutes(
         total: order.total,
         fulfillmentDate: order.fulfillmentDate,
         fulfillmentWindow: order.fulfillmentWindow,
-        location: { name: order.location.name },
+        deliveryAddress: order.deliveryAddress,
+        deliveryCity: order.deliveryCity,
+        deliveryState: order.deliveryState,
+        deliveryZip: order.deliveryZip,
         items: order.items.map(item => ({
           quantity: item.quantity,
           total: item.total,
@@ -233,6 +242,44 @@ export async function registerRoutes(
             message: "Failed to capture payment",
             error: stripeError.message 
           });
+        }
+
+        // Generate invoice when order is approved
+        try {
+          const existingInvoice = await storage.getInvoiceByOrderId(order.id);
+          if (!existingInvoice) {
+            const invoiceNumber = await storage.getNextInvoiceNumber();
+            const invoice = await storage.createInvoice({
+              invoiceNumber,
+              orderId: order.id,
+              customerName: order.customerName,
+              customerEmail: order.customerEmail,
+              customerPhone: order.customerPhone,
+              deliveryAddress: order.deliveryAddress,
+              deliveryCity: order.deliveryCity,
+              deliveryState: order.deliveryState,
+              deliveryZip: order.deliveryZip,
+              subtotal: order.subtotal,
+              tax: "0",
+              total: order.total,
+              status: "sent",
+            });
+
+            // Create invoice line items
+            for (const item of order.items) {
+              await storage.createInvoiceItem({
+                invoiceId: invoice.id,
+                productId: item.productId,
+                productName: item.product.name,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                total: item.total,
+              });
+            }
+          }
+        } catch (invoiceError) {
+          console.error("Invoice creation error:", invoiceError);
+          // Continue even if invoice creation fails
         }
       } else if (status === "cancelled" && order.stripePaymentIntentId && order.stripePaymentStatus !== "captured") {
         // Cancel authorization if not yet captured
@@ -556,6 +603,105 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
       res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
+  // ==========================================
+  // INVOICE ROUTES
+  // ==========================================
+
+  // Admin: Get all invoices
+  app.get("/api/admin/invoices", isAuthenticated, async (req, res) => {
+    try {
+      const invoices = await storage.getInvoices();
+      res.json(invoices);
+    } catch (error) {
+      console.error("Error fetching invoices:", error);
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  // Admin: Get single invoice
+  app.get("/api/admin/invoices/:id", isAuthenticated, async (req, res) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error fetching invoice:", error);
+      res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+
+  // Admin: Update invoice status
+  app.patch("/api/admin/invoices/:id/status", isAuthenticated, async (req, res) => {
+    try {
+      const statusSchema = z.object({ status: z.string().min(1) });
+      const parseResult = statusSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      const invoice = await storage.updateInvoiceStatus(req.params.id, parseResult.data.status);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      console.error("Error updating invoice status:", error);
+      res.status(500).json({ message: "Failed to update invoice status" });
+    }
+  });
+
+  // ==========================================
+  // INVENTORY ADJUSTMENT ROUTES
+  // ==========================================
+
+  // Admin: Get inventory adjustments
+  app.get("/api/admin/inventory-adjustments", isAuthenticated, async (req, res) => {
+    try {
+      const ingredientId = req.query.ingredientId as string | undefined;
+      const adjustments = await storage.getInventoryAdjustments(ingredientId);
+      res.json(adjustments);
+    } catch (error) {
+      console.error("Error fetching adjustments:", error);
+      res.status(500).json({ message: "Failed to fetch adjustments" });
+    }
+  });
+
+  // Admin: Create inventory adjustment
+  app.post("/api/admin/inventory-adjustments", isAuthenticated, async (req, res) => {
+    try {
+      const adjustmentSchema = z.object({
+        ingredientId: z.string().min(1),
+        adjustmentType: z.enum(["receive", "waste", "correction", "production"]),
+        quantity: z.number(),
+        reason: z.string().optional(),
+      });
+
+      const parseResult = adjustmentSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid adjustment data",
+          errors: parseResult.error.errors 
+        });
+      }
+
+      const { ingredientId, adjustmentType, quantity, reason } = parseResult.data;
+      const adjustment = await storage.adjustIngredientInventory(
+        ingredientId,
+        quantity,
+        adjustmentType,
+        reason,
+        "admin" // In a real app, get from session
+      );
+
+      res.json(adjustment);
+    } catch (error: any) {
+      console.error("Error creating adjustment:", error);
+      res.status(500).json({ message: error.message || "Failed to create adjustment" });
     }
   });
 

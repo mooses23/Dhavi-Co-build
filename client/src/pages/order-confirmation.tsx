@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, Clock, MapPin, Calendar } from "lucide-react";
+import { CheckCircle2, Clock, MapPin, Calendar, Truck } from "lucide-react";
 import { format } from "date-fns";
 import type { Order } from "@shared/schema";
 
@@ -75,7 +75,7 @@ export default function OrderConfirmationPage() {
             </div>
             <CardTitle className="font-serif text-2xl">Order Confirmed!</CardTitle>
             <p className="text-muted-foreground mt-2">
-              Thank you for your order. We'll notify you when it's ready for pickup.
+              Thank you for your order. We'll notify you when it's out for delivery.
             </p>
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
@@ -91,16 +91,26 @@ export default function OrderConfirmationPage() {
 
             <div className="grid gap-4">
               <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-gold mt-0.5" />
+                <Truck className="h-5 w-5 text-gold mt-0.5" />
                 <div>
-                  <p className="font-medium">Pickup Location</p>
-                  <p className="text-muted-foreground">{order.location?.name || "Location"}</p>
+                  <p className="font-medium">Delivery Address</p>
+                  <p className="text-muted-foreground">
+                    {order.deliveryAddress || "Address not provided"}
+                    {order.deliveryCity && `, ${order.deliveryCity}`}
+                    {order.deliveryState && `, ${order.deliveryState}`}
+                    {order.deliveryZip && ` ${order.deliveryZip}`}
+                  </p>
+                  {order.deliveryInstructions && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Note: {order.deliveryInstructions}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <Calendar className="h-5 w-5 text-gold mt-0.5" />
                 <div>
-                  <p className="font-medium">Pickup Date</p>
+                  <p className="font-medium">Delivery Date</p>
                   <p className="text-muted-foreground">
                     {format(new Date(order.fulfillmentDate), "EEEE, MMMM d, yyyy")}
                   </p>
@@ -109,7 +119,7 @@ export default function OrderConfirmationPage() {
               <div className="flex items-start gap-3">
                 <Clock className="h-5 w-5 text-gold mt-0.5" />
                 <div>
-                  <p className="font-medium">Time Window</p>
+                  <p className="font-medium">Delivery Window</p>
                   <p className="text-muted-foreground capitalize">{order.fulfillmentWindow}</p>
                 </div>
               </div>

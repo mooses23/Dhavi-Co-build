@@ -17,6 +17,7 @@ import OrderConfirmationPage from "@/pages/order-confirmation";
 
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminOrders from "@/pages/admin/orders";
+import AdminInvoices from "@/pages/admin/invoices";
 import AdminProduction from "@/pages/admin/production";
 import AdminProducts from "@/pages/admin/products";
 import AdminIngredients from "@/pages/admin/ingredients";
@@ -80,6 +81,7 @@ function AdminRoutes() {
       <Switch>
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/orders" component={AdminOrders} />
+        <Route path="/admin/invoices" component={AdminInvoices} />
         <Route path="/admin/production" component={AdminProduction} />
         <Route path="/admin/products" component={AdminProducts} />
         <Route path="/admin/ingredients" component={AdminIngredients} />

@@ -15,17 +15,22 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, CalendarIcon, Minus, Plus, ShoppingBag } from "lucide-react";
+import { ArrowLeft, CalendarIcon, MapPin, Minus, Plus, ShoppingBag } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Product, Location } from "@shared/schema";
+import type { Product } from "@shared/schema";
 
 const orderFormSchema = z.object({
   customerName: z.string().min(2, "Name is required"),
   customerEmail: z.string().email("Valid email is required"),
   customerPhone: z.string().optional(),
-  locationId: z.string().min(1, "Please select a pickup location"),
-  fulfillmentDate: z.date({ required_error: "Please select a pickup date" }),
-  fulfillmentWindow: z.string().min(1, "Please select a time window"),
+  deliveryAddress: z.string().min(5, "Street address is required"),
+  deliveryCity: z.string().min(2, "City is required"),
+  deliveryState: z.string().min(2, "State is required"),
+  deliveryZip: z.string().min(5, "Valid zip code is required"),
+  deliveryInstructions: z.string().optional(),
+  fulfillmentDate: z.date({ required_error: "Please select a delivery date" }),
+  fulfillmentWindow: z.string().min(1, "Please select a delivery window"),
 });
 
 type OrderFormData = z.infer<typeof orderFormSchema>;
@@ -39,17 +44,17 @@ export default function OrderPage() {
     queryKey: ["/api/products"],
   });
 
-  const { data: locations, isLoading: locationsLoading } = useQuery<Location[]>({
-    queryKey: ["/api/locations"],
-  });
-
   const form = useForm<OrderFormData>({
     resolver: zodResolver(orderFormSchema),
     defaultValues: {
       customerName: "",
       customerEmail: "",
       customerPhone: "",
-      locationId: "",
+      deliveryAddress: "",
+      deliveryCity: "",
+      deliveryState: "",
+      deliveryZip: "",
+      deliveryInstructions: "",
       fulfillmentWindow: "",
     },
   });
@@ -113,7 +118,6 @@ export default function OrderPage() {
     });
   };
 
-  const activeLocations = locations?.filter((l) => l.isActive) || [];
   const activeProducts = products?.filter((p) => p.isActive) || [];
 
   const minDate = addDays(new Date(), 1);
@@ -148,7 +152,7 @@ export default function OrderPage() {
         <div className="mb-8">
           <h1 className="font-serif text-3xl font-bold">Order Fresh Bagels</h1>
           <p className="text-muted-foreground mt-2">
-            Select your bagels and choose a pickup location
+            Select your bagels and enter your delivery address
           </p>
         </div>
 
@@ -213,7 +217,7 @@ export default function OrderPage() {
             </section>
 
             <section>
-              <h2 className="font-serif text-xl font-semibold mb-4">Pickup Details</h2>
+              <h2 className="font-serif text-xl font-semibold mb-4">Delivery Details</h2>
               <Card>
                 <CardContent className="p-6">
                   <Form {...form}>
@@ -261,30 +265,81 @@ export default function OrderPage() {
                         )}
                       />
 
+                      <div className="pt-2 pb-1 flex items-center gap-2 text-sm font-medium">
+                        <MapPin className="h-4 w-4 text-gold" />
+                        <span>Delivery Address</span>
+                      </div>
+
                       <FormField
                         control={form.control}
-                        name="locationId"
+                        name="deliveryAddress"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Pickup Location</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <FormLabel>Street Address</FormLabel>
+                            <FormControl>
+                              <Input placeholder="123 Main Street, Apt 4B" {...field} data-testid="input-address" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="deliveryCity"
+                          render={({ field }) => (
+                            <FormItem className="col-span-2 sm:col-span-1">
+                              <FormLabel>City</FormLabel>
                               <FormControl>
-                                <SelectTrigger data-testid="select-location">
-                                  <SelectValue placeholder="Select a location" />
-                                </SelectTrigger>
+                                <Input placeholder="Brooklyn" {...field} data-testid="input-city" />
                               </FormControl>
-                              <SelectContent>
-                                {locationsLoading ? (
-                                  <SelectItem value="loading" disabled>Loading...</SelectItem>
-                                ) : (
-                                  activeLocations.map((location) => (
-                                    <SelectItem key={location.id} value={location.id}>
-                                      {location.name} ({location.type})
-                                    </SelectItem>
-                                  ))
-                                )}
-                              </SelectContent>
-                            </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="deliveryState"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>State</FormLabel>
+                              <FormControl>
+                                <Input placeholder="NY" {...field} data-testid="input-state" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="deliveryZip"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Zip Code</FormLabel>
+                              <FormControl>
+                                <Input placeholder="11201" {...field} data-testid="input-zip" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="deliveryInstructions"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Delivery Instructions (optional)</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Gate code, buzzer number, leave at door, etc." 
+                                className="resize-none"
+                                {...field} 
+                                data-testid="input-instructions" 
+                              />
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -296,7 +351,7 @@ export default function OrderPage() {
                           name="fulfillmentDate"
                           render={({ field }) => (
                             <FormItem className="flex flex-col">
-                              <FormLabel>Pickup Date</FormLabel>
+                              <FormLabel>Delivery Date</FormLabel>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <FormControl>
@@ -330,7 +385,7 @@ export default function OrderPage() {
                           name="fulfillmentWindow"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Time Window</FormLabel>
+                              <FormLabel>Delivery Window</FormLabel>
                               <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                   <SelectTrigger data-testid="select-time">
