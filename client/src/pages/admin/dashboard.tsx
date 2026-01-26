@@ -16,11 +16,11 @@ import type { Order, Ingredient } from "@shared/schema";
 
 export default function AdminDashboard() {
   const { data: orders, isLoading: ordersLoading } = useQuery<Order[]>({
-    queryKey: ["/api/orders"],
+    queryKey: ["/api/admin/orders"],
   });
 
   const { data: ingredients, isLoading: ingredientsLoading } = useQuery<Ingredient[]>({
-    queryKey: ["/api/ingredients"],
+    queryKey: ["/api/admin/ingredients"],
   });
 
   const { data: stats } = useQuery<{
@@ -29,7 +29,7 @@ export default function AdminDashboard() {
     todayRevenue: number;
     lowStockCount: number;
   }>({
-    queryKey: ["/api/stats/dashboard"],
+    queryKey: ["/api/admin/stats/dashboard"],
   });
 
   const pendingOrders = orders?.filter((o) => o.status === "new") || [];

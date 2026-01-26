@@ -1,0 +1,119 @@
+# D'havi.co - Premium Spelt Bagel Bakery Operating System
+
+## Overview
+D'havi.co is a production-ready web application for a premium small-batch spelt bagel brand. This system models physical reality, not just online commerce - bagels come from ingredients, ingredients become batches, batches become finished goods, and orders reserve reality first, money second.
+
+## Project Architecture
+
+### Tech Stack
+- **Frontend**: React + TypeScript + Vite + Tailwind CSS + shadcn/ui
+- **Backend**: Express.js + TypeScript
+- **Database**: PostgreSQL with Drizzle ORM
+- **Authentication**: Replit Auth (OpenID Connect)
+- **Payments**: Stripe (PaymentIntents with manual capture)
+
+### Portability Notes (Vercel/Supabase)
+The code is structured to be portable:
+- Drizzle ORM works with any PostgreSQL (including Supabase)
+- Environment variables: `DATABASE_URL`, `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `SESSION_SECRET`
+- For Vercel deployment, configure environment variables and update the build commands
+
+## Key Features
+
+### 1. Public Order Flow
+- Customers can browse products and place orders without logging in
+- Select pickup location and date/time window
+- Stripe authorization (manual capture) - card is authorized but not charged until admin approves
+
+### 2. Admin Dashboard (Protected)
+- **Orders Queue**: View, approve, reject orders. Approving captures payment.
+- **Production Planner**: Schedule batches, track production runs
+- **Inventory Management**: Track ingredients with reorder alerts
+- **Products**: Manage bagel SKUs with Bill of Materials
+- **Locations**: Manage pickup spots, pop-ups, wholesale accounts
+
+### 3. Physical Reality Constraints
+- Bill of Materials: Each product has defined ingredient requirements
+- Batch completion deducts ingredients from inventory
+- Low stock alerts when ingredients fall below reorder threshold
+
+## File Structure
+
+```
+client/
+  src/
+    pages/
+      landing.tsx          - Public landing page
+      order.tsx            - Public order form
+      checkout.tsx         - Stripe payment page
+      order-confirmation.tsx - Order confirmation
+      admin/
+        dashboard.tsx      - Admin dashboard
+        orders.tsx         - Order management
+        production.tsx     - Batch production
+        products.tsx       - Product catalog
+        ingredients.tsx    - Ingredient inventory
+        locations.tsx      - Location management
+        marketing.tsx      - Brand assets
+    components/
+      app-sidebar.tsx      - Admin navigation
+      theme-toggle.tsx     - Dark/light mode toggle
+
+server/
+  routes.ts               - API endpoints
+  storage.ts              - Database operations
+  db.ts                   - Database connection
+  replit_integrations/
+    auth/                 - Replit Auth integration
+
+shared/
+  schema.ts               - Drizzle database schema
+  models/
+    auth.ts               - Auth-related schemas
+```
+
+## API Endpoints
+
+### Public
+- `GET /api/products` - List active products
+- `GET /api/locations` - List active locations
+- `POST /api/orders` - Create order (returns Stripe client secret)
+- `GET /api/orders/:id` - Get order details
+
+### Protected (Admin)
+- `GET /api/admin/orders` - List all orders
+- `PATCH /api/orders/:id/status` - Update order status (triggers payment capture/cancel)
+- `POST /api/products` - Create product
+- `PATCH /api/products/:id` - Update product
+- `POST /api/ingredients` - Create ingredient
+- `PATCH /api/ingredients/:id` - Update ingredient
+- `POST /api/locations` - Create location
+- `PATCH /api/locations/:id` - Update location
+- `GET /api/batches` - List batches
+- `POST /api/batches` - Create batch
+- `PATCH /api/batches/:id/status` - Update batch status (deducts ingredients on completion)
+
+## Order Lifecycle
+1. **New**: Customer placed order, payment authorized
+2. **Approved**: Admin approved, payment captured
+3. **Baking**: Order in production
+4. **Ready**: Ready for pickup
+5. **Completed**: Customer picked up
+6. **Cancelled**: Order cancelled, authorization voided
+
+## Design System
+- **Colors**: Matte black with gold accents (#d4a017)
+- **Typography**: Playfair Display (headings), Inter (body)
+- **Theme**: Dark mode by default, light mode available
+
+## Development Commands
+- `npm run dev` - Start development server
+- `npm run db:push` - Push schema changes to database
+- `npm run build` - Build for production
+
+## Environment Variables
+- `DATABASE_URL` - PostgreSQL connection string
+- `SESSION_SECRET` - Session encryption key
+- `STRIPE_SECRET_KEY` - Stripe secret key
+- `STRIPE_PUBLISHABLE_KEY` - Stripe publishable key
+- `VITE_STRIPE_PUBLISHABLE_KEY` - Stripe key for frontend

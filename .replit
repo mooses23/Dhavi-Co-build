@@ -40,3 +40,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.0"]
+
+[userenv]
+
+[userenv.shared]
+VITE_STRIPE_PUBLISHABLE_KEY = "pk_test_51StgpWLNxbMiXzlh2cNriU6l0pmmQyVaTSIdhIyADIelzlXMrKKFAFSyS39E4JeOTecTly2IDfAp3rtiuDm4ThvU00B4EsiJkj"
