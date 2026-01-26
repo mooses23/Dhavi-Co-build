@@ -183,14 +183,21 @@ export type InsertLocationInventory = z.infer<typeof insertLocationInventorySche
 export type LocationInventory = typeof locationInventory.$inferSelect;
 
 // ============================================
-// ORDERS - Customer orders
+// ORDERS - Customer orders (delivery-based)
 // ============================================
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email").notNull(),
   customerPhone: text("customer_phone"),
-  locationId: varchar("location_id").notNull().references(() => locations.id),
+  // Delivery address fields
+  deliveryAddress: text("delivery_address").notNull(),
+  deliveryCity: text("delivery_city").notNull(),
+  deliveryState: text("delivery_state").notNull(),
+  deliveryZip: text("delivery_zip").notNull(),
+  deliveryInstructions: text("delivery_instructions"),
+  // Keep locationId for internal routing/fulfillment (optional now)
+  locationId: varchar("location_id").references(() => locations.id),
   fulfillmentDate: timestamp("fulfillment_date").notNull(),
   fulfillmentWindow: text("fulfillment_window"), // morning, afternoon, evening
   status: text("status").notNull().default("new"), // new, approved, baking, ready, completed, cancelled
@@ -278,6 +285,108 @@ export type InsertMarketingAsset = z.infer<typeof insertMarketingAssetSchema>;
 export type MarketingAsset = typeof marketingAssets.$inferSelect;
 
 // ============================================
+// INVOICES - Generated from approved orders
+// ============================================
+export const invoices = pgTable("invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  orderId: varchar("order_id").notNull().references(() => orders.id),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email").notNull(),
+  customerPhone: text("customer_phone"),
+  deliveryAddress: text("delivery_address").notNull(),
+  deliveryCity: text("delivery_city").notNull(),
+  deliveryState: text("delivery_state").notNull(),
+  deliveryZip: text("delivery_zip").notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  tax: decimal("tax", { precision: 10, scale: 2 }).notNull().default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  status: text("status").notNull().default("draft"), // draft, sent, paid, cancelled
+  issuedAt: timestamp("issued_at").defaultNow(),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const invoicesRelations = relations(invoices, ({ one, many }) => ({
+  order: one(orders, {
+    fields: [invoices.orderId],
+    references: [orders.id],
+  }),
+  items: many(invoiceItems),
+}));
+
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+
+// ============================================
+// INVOICE ITEMS - Line items on an invoice
+// ============================================
+export const invoiceItems = pgTable("invoice_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull().references(() => invoices.id),
+  productId: varchar("product_id").notNull().references(() => products.id),
+  productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const invoiceItemsRelations = relations(invoiceItems, ({ one }) => ({
+  invoice: one(invoices, {
+    fields: [invoiceItems.invoiceId],
+    references: [invoices.id],
+  }),
+  product: one(products, {
+    fields: [invoiceItems.productId],
+    references: [products.id],
+  }),
+}));
+
+export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({
+  id: true,
+});
+
+export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
+export type InvoiceItem = typeof invoiceItems.$inferSelect;
+
+// ============================================
+// INVENTORY ADJUSTMENTS - Track changes to ingredient inventory
+// ============================================
+export const inventoryAdjustments = pgTable("inventory_adjustments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ingredientId: varchar("ingredient_id").notNull().references(() => ingredients.id),
+  adjustmentType: text("adjustment_type").notNull(), // receive, waste, correction, production
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(), // positive = add, negative = subtract
+  previousQuantity: decimal("previous_quantity", { precision: 10, scale: 2 }).notNull(),
+  newQuantity: decimal("new_quantity", { precision: 10, scale: 2 }).notNull(),
+  reason: text("reason"),
+  adjustedBy: text("adjusted_by"), // user who made adjustment
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const inventoryAdjustmentsRelations = relations(inventoryAdjustments, ({ one }) => ({
+  ingredient: one(ingredients, {
+    fields: [inventoryAdjustments.ingredientId],
+    references: [ingredients.id],
+  }),
+}));
+
+export const insertInventoryAdjustmentSchema = createInsertSchema(inventoryAdjustments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertInventoryAdjustment = z.infer<typeof insertInventoryAdjustmentSchema>;
+export type InventoryAdjustment = typeof inventoryAdjustments.$inferSelect;
+
+// ============================================
 // Order status enum for type safety
 // ============================================
 export const ORDER_STATUSES = ["new", "approved", "baking", "ready", "completed", "cancelled"] as const;
@@ -291,3 +400,9 @@ export type LocationType = typeof LOCATION_TYPES[number];
 
 export const FULFILLMENT_WINDOWS = ["morning", "afternoon", "evening"] as const;
 export type FulfillmentWindow = typeof FULFILLMENT_WINDOWS[number];
+
+export const ADJUSTMENT_TYPES = ["receive", "waste", "correction", "production"] as const;
+export type AdjustmentType = typeof ADJUSTMENT_TYPES[number];
+
+export const INVOICE_STATUSES = ["draft", "sent", "paid", "cancelled"] as const;
+export type InvoiceStatus = typeof INVOICE_STATUSES[number];

@@ -11,6 +11,9 @@ import {
   orders,
   orderItems,
   marketingAssets,
+  invoices,
+  invoiceItems,
+  inventoryAdjustments,
   type Ingredient,
   type InsertIngredient,
   type Product,
@@ -31,6 +34,12 @@ import {
   type InsertOrderItem,
   type MarketingAsset,
   type InsertMarketingAsset,
+  type Invoice,
+  type InsertInvoice,
+  type InvoiceItem,
+  type InsertInvoiceItem,
+  type InventoryAdjustment,
+  type InsertInventoryAdjustment,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -80,6 +89,20 @@ export interface IStorage {
   // Marketing Assets
   getMarketingAssets(): Promise<MarketingAsset[]>;
   createMarketingAsset(data: InsertMarketingAsset): Promise<MarketingAsset>;
+
+  // Invoices
+  getInvoices(): Promise<(Invoice & { items: InvoiceItem[] })[]>;
+  getInvoice(id: string): Promise<(Invoice & { items: InvoiceItem[] }) | undefined>;
+  getInvoiceByOrderId(orderId: string): Promise<Invoice | undefined>;
+  createInvoice(data: InsertInvoice): Promise<Invoice>;
+  createInvoiceItem(data: InsertInvoiceItem): Promise<InvoiceItem>;
+  updateInvoiceStatus(id: string, status: string): Promise<Invoice | undefined>;
+  getNextInvoiceNumber(): Promise<string>;
+
+  // Inventory Adjustments
+  getInventoryAdjustments(ingredientId?: string): Promise<(InventoryAdjustment & { ingredient: Ingredient })[]>;
+  createInventoryAdjustment(data: InsertInventoryAdjustment): Promise<InventoryAdjustment>;
+  adjustIngredientInventory(ingredientId: string, quantity: number, type: string, reason?: string, adjustedBy?: string): Promise<InventoryAdjustment>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -372,6 +395,132 @@ export class DatabaseStorage implements IStorage {
   async createMarketingAsset(data: InsertMarketingAsset): Promise<MarketingAsset> {
     const [asset] = await db.insert(marketingAssets).values(data).returning();
     return asset;
+  }
+
+  // Invoices
+  async getInvoices(): Promise<(Invoice & { items: InvoiceItem[] })[]> {
+    const allInvoices = await db.select().from(invoices).orderBy(desc(invoices.createdAt));
+    
+    const result = [];
+    for (const invoice of allInvoices) {
+      const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, invoice.id));
+      result.push({ ...invoice, items });
+    }
+    
+    return result;
+  }
+
+  async getInvoice(id: string): Promise<(Invoice & { items: InvoiceItem[] }) | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    if (!invoice) return undefined;
+
+    const items = await db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+    return { ...invoice, items };
+  }
+
+  async getInvoiceByOrderId(orderId: string): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.orderId, orderId));
+    return invoice;
+  }
+
+  async createInvoice(data: InsertInvoice): Promise<Invoice> {
+    const [invoice] = await db.insert(invoices).values(data).returning();
+    return invoice;
+  }
+
+  async createInvoiceItem(data: InsertInvoiceItem): Promise<InvoiceItem> {
+    const [item] = await db.insert(invoiceItems).values(data).returning();
+    return item;
+  }
+
+  async updateInvoiceStatus(id: string, status: string): Promise<Invoice | undefined> {
+    const updateData: any = { status, updatedAt: new Date() };
+    if (status === "paid") {
+      updateData.paidAt = new Date();
+    }
+    const [invoice] = await db
+      .update(invoices)
+      .set(updateData)
+      .where(eq(invoices.id, id))
+      .returning();
+    return invoice;
+  }
+
+  async getNextInvoiceNumber(): Promise<string> {
+    const [latest] = await db
+      .select({ invoiceNumber: invoices.invoiceNumber })
+      .from(invoices)
+      .orderBy(desc(invoices.createdAt))
+      .limit(1);
+    
+    const year = new Date().getFullYear();
+    if (!latest) {
+      return `INV-${year}-0001`;
+    }
+    
+    const parts = latest.invoiceNumber.split("-");
+    const lastNum = parseInt(parts[2] || "0", 10);
+    const nextNum = lastNum + 1;
+    return `INV-${year}-${nextNum.toString().padStart(4, "0")}`;
+  }
+
+  // Inventory Adjustments
+  async getInventoryAdjustments(ingredientId?: string): Promise<(InventoryAdjustment & { ingredient: Ingredient })[]> {
+    let query = db
+      .select()
+      .from(inventoryAdjustments)
+      .innerJoin(ingredients, eq(inventoryAdjustments.ingredientId, ingredients.id))
+      .orderBy(desc(inventoryAdjustments.createdAt));
+    
+    if (ingredientId) {
+      query = query.where(eq(inventoryAdjustments.ingredientId, ingredientId)) as any;
+    }
+    
+    const results = await query;
+    return results.map((row) => ({
+      ...row.inventory_adjustments,
+      ingredient: row.ingredients,
+    }));
+  }
+
+  async createInventoryAdjustment(data: InsertInventoryAdjustment): Promise<InventoryAdjustment> {
+    const [adjustment] = await db.insert(inventoryAdjustments).values(data).returning();
+    return adjustment;
+  }
+
+  async adjustIngredientInventory(
+    ingredientId: string,
+    quantity: number,
+    type: string,
+    reason?: string,
+    adjustedBy?: string
+  ): Promise<InventoryAdjustment> {
+    const ingredient = await this.getIngredient(ingredientId);
+    if (!ingredient) {
+      throw new Error("Ingredient not found");
+    }
+
+    const previousQuantity = parseFloat(ingredient.onHand);
+    const newQuantity = previousQuantity + quantity;
+
+    // Update ingredient inventory
+    await db
+      .update(ingredients)
+      .set({ onHand: newQuantity.toString(), updatedAt: new Date() })
+      .where(eq(ingredients.id, ingredientId));
+
+    // Create adjustment record
+    const adjustment = await this.createInventoryAdjustment({
+      ingredientId,
+      adjustmentType: type,
+      quantity: quantity.toString(),
+      previousQuantity: previousQuantity.toString(),
+      newQuantity: newQuantity.toString(),
+      reason,
+      adjustedBy,
+    });
+
+    return adjustment;
   }
 }
 
