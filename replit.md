@@ -16,7 +16,21 @@ D'havi.co is a production-ready web application for a premium small-batch spelt 
 The code is structured to be portable:
 - Drizzle ORM works with any PostgreSQL (including Supabase)
 - Environment variables: `DATABASE_URL`, `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `SESSION_SECRET`
-- For Vercel deployment, configure environment variables and update the build commands
+
+**Vercel Deployment:**
+The project includes full Vercel configuration:
+- `vercel.json` - Routes API requests to serverless function, static assets to CDN
+- `api/index.ts` - Serverless function entry point that wraps the Express app
+- Build outputs static files to `public/` for Vercel CDN serving
+
+To deploy to Vercel:
+1. Connect your GitHub repo to Vercel
+2. Configure environment variables in Vercel dashboard:
+   - `DATABASE_URL` - Supabase PostgreSQL connection string
+   - `STRIPE_SECRET_KEY` - Your Stripe secret key
+   - `STRIPE_PUBLISHABLE_KEY` - Your Stripe publishable key
+   - `SESSION_SECRET` - Random string for session encryption
+3. Deploy - Vercel will automatically run `npm run build`
 
 ## Key Features
 
