@@ -1,0 +1,140 @@
+Build a production-ready web application for D’havi.co, a premium small-batch spelt bagel brand currently operating from a basement and selling limited quantities across multiple locations (pickup spots, pop-ups, wholesale clients), with the explicit intention to scale into a serious Consumer Packaged Goods (CPG) business.
+
+⸻
+
+CORE MINDSET
+
+This system must model physical reality, not just online commerce.
+
+Bagels come from ingredients.
+Ingredients become batches.
+Batches become finished goods.
+Finished goods are allocated to locations.
+Orders reserve reality first, money second.
+
+The application should behave like a bakery operating system, not a Shopify clone.
+
+⸻
+
+TECH STACK (NO PLATFORM LOCK-IN)
+	•	Next.js App Router (TypeScript, Server Components)
+	•	Tailwind CSS (clean, premium, minimal)
+	•	Supabase:
+	•	Postgres (primary data store)
+	•	Auth (admin users only)
+	•	Storage (product + marketing images)
+	•	Prisma ORM
+	•	Stripe Payments:
+	•	PaymentIntents with capture_method=manual (authorize now, capture later)
+	•	Deployment target: Vercel
+	•	No Replit-specific dependencies or tooling
+
+⸻
+
+DOMAIN MODULES (ALL REQUIRED)
+
+1. Orders & Payments (Permission-First Commerce)
+	•	Public order form (no login required)
+	•	Customer selects:
+	•	Products + quantities
+	•	Fulfillment location
+	•	Fulfillment date/time window
+	•	On checkout:
+	•	Create Order in database
+	•	Create Stripe PaymentIntent with manual capture (authorization only)
+	•	Order lifecycle:
+	•	New → Approved → Baking → Ready → Completed → Cancelled
+	•	Admin actions:
+	•	Approve order → reserves inventory → captures payment
+	•	Reject order → cancels authorization
+	•	Orders must auto-expire if not approved within safe authorization windows
+
+⸻
+
+2. Ingredients & Inventory (Truth Layer)
+The system must understand what is physically possible.
+	•	Ingredients table:
+	•	flour, spelt flour, sesame, poppy, everything seasoning, cornmeal, oil, salt, yeast, etc.
+	•	units, on_hand quantity, reorder thresholds
+	•	Products table (bagel SKUs)
+	•	Bill of Materials (BOM):
+	•	exact ingredient quantities required per bagel
+	•	System must continuously calculate:
+	•	maximum bagels producible today
+	•	remaining slack after approved orders
+	•	If approved orders exceed production capacity:
+	•	system must block further approvals
+
+⸻
+
+3. Production & Batches (Batch-First Thinking)
+	•	Batches represent real production runs:
+	•	date, shift, notes
+	•	Each batch:
+	•	consumes ingredients
+	•	produces finished bagels by SKU
+	•	On batch completion:
+	•	ingredients are deducted
+	•	finished goods enter virtual inventory bins
+	•	Orders pull from bins, not directly from batches
+
+⸻
+
+4. Locations & Allocation
+	•	Locations table:
+	•	basement, pop-ups, wholesale accounts, delivery routes
+	•	Finished goods must be explicitly allocated to locations
+	•	Track:
+	•	inventory per location
+	•	sales per location
+	•	waste/loss per location
+	•	Every order must reference the physical location it was fulfilled from
+
+⸻
+
+5. Marketing Assets (Photo-Aware Brand System)
+Marketing visuals are first-class data, not static uploads.
+	•	Marketing assets table:
+	•	asset type: hero, ingredient, process, lifestyle, packaging
+	•	reference image (stored in Supabase Storage)
+	•	usage context: homepage, product page, email, social, wholesale deck
+	•	notes on lighting, crop, mood
+	•	Use the provided D’havi packaging design as the visual anchor:
+	•	matte black
+	•	gold serif typography
+	•	premium, artisanal, honest aesthetic
+	•	Admin dashboard should surface:
+	•	missing assets per product
+	•	stale assets (not refreshed recently)
+
+⸻
+
+6. Admin Dashboard (Ops-First)
+	•	Orders queue with real-time status
+	•	Production planner (what needs to be baked today)
+	•	Ingredient stock + low-inventory alerts
+	•	Location sales breakdowns
+	•	Marketing asset health overview
+
+⸻
+
+SECURITY
+	•	Enable Row Level Security (RLS) on all tables
+	•	Public users:
+	•	may create orders only
+	•	may view only their own order status
+	•	Admin users:
+	•	full access to inventory, production, locations, marketing
+
+⸻
+
+OUTPUT REQUIREMENTS
+	•	Clean, fast, mobile-first UI
+	•	Business-logic-driven backend (not UI hacks)
+	•	.env.example for Vercel deployment
+	•	Clear README explaining:
+	•	how physical bakery constraints are enforced
+	•	how the system scales from basement to brand
+
+The final product should feel like a bakery brain:
+disciplined, honest, inventory-aware, and brand-forward — not a generic online store
