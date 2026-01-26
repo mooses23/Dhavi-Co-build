@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { app, initializeRoutes } from "../server/app";
-import { serveStatic } from "../server/static";
 
 let initialized = false;
 
@@ -8,7 +7,7 @@ async function ensureInitialized() {
   if (initialized) return;
   
   await initializeRoutes();
-  serveStatic(app);
+  // Don't call serveStatic on Vercel - static files are served by CDN
   
   initialized = true;
 }

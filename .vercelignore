@@ -1,0 +1,7 @@
+# Ignore build artifacts that shouldn't be deployed
+dist/
+node_modules/
+
+# Ignore development files
+*.log
+.env.local
