@@ -2,7 +2,7 @@ import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
 
-const isVercel = process.env.VERCEL === "1";
+const isVercel = process.env.VERCEL === "1" || !!process.env.VERCEL_ENV;
 
 export function serveStatic(app: Express) {
   // On Vercel, static files are served by CDN and SPA routing is handled by rewrites
