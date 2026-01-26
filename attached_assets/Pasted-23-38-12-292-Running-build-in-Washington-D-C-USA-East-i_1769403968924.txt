@@ -1,0 +1,47 @@
+23:38:12.292 Running build in Washington, D.C., USA (East) – iad1
+23:38:12.297 Build machine configuration: 2 cores, 8 GB
+23:38:12.562 Cloning github.com/mooses23/Dhavi-Co-build (Branch: main, Commit: 6a62b01)
+23:38:12.563 Previous build caches not available.
+23:38:13.709 Cloning completed: 1.147s
+23:38:14.070 Running "vercel build"
+23:38:15.464 Vercel CLI 50.4.10
+23:38:15.992 Installing dependencies...
+23:38:25.957 
+23:38:25.957 added 497 packages in 10s
+23:38:25.958 
+23:38:25.959 80 packages are looking for funding
+23:38:25.959   run `npm fund` for details
+23:38:26.011 Running "npm run build"
+23:38:26.111 
+23:38:26.111 > rest-express@1.0.0 build
+23:38:26.113 > tsx script/build.ts
+23:38:26.113 
+23:38:26.989 building client...
+23:38:27.056 [36mvite v7.3.0 [32mbuilding client environment for production...[36m[39m
+23:38:27.617 transforming...
+23:38:28.466 
+23:38:28.466 A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+23:38:32.165 [32m✓[39m 2573 modules transformed.
+23:38:32.559 rendering chunks...
+23:38:32.573 computing gzip size...
+23:38:32.593 [2m../dist/public/[22m[32mindex.html                 [39m[1m[2m  2.22 kB[22m[1m[22m[2m │ gzip:   0.88 kB[22m
+23:38:32.593 [2m../dist/public/[22m[2massets/[22m[35mindex-Cza7uhD3.css  [39m[1m[2m 76.60 kB[22m[1m[22m[2m │ gzip:  12.45 kB[22m
+23:38:32.593 [2m../dist/public/[22m[2massets/[22m[36mindex-BLjvf0uf.js   [39m[1m[33m561.72 kB[39m[22m[2m │ gzip: 169.41 kB[22m
+23:38:32.594 [33m
+23:38:32.594 (!) Some chunks are larger than 500 kB after minification. Consider:
+23:38:32.594 - Using dynamic import() to code-split the application
+23:38:32.594 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+23:38:32.594 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+23:38:32.595 [32m✓ built in 5.31s[39m
+23:38:32.595 building server...
+23:38:32.856 
+23:38:32.856   dist/index.cjs  1.2mb ⚠️
+23:38:32.856 
+23:38:32.857 ⚡ Done in 249ms
+23:38:33.002 Build Completed in /vercel/output [17s]
+23:38:33.033 Deploying outputs...
+23:38:34.974 Deployment completed
+23:38:35.946 Creating build cache...
+23:38:50.554 Created build cache: 14.603s
+23:38:50.555 Uploading build cache [76.01 MB]
+23:38:51.693 Build cache uploaded: 1.142s
