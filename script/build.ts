@@ -1,9 +1,8 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, cp, mkdir } from "fs/promises";
+import { existsSync } from "fs";
 
-// server deps to bundle to reduce openat(2) syscalls
-// which helps cold start times
 const allowlist = [
   "@google/generative-ai",
   "axios",
@@ -59,6 +58,13 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // Copy static assets to root public directory for Vercel CDN
+  if (existsSync("dist/public")) {
+    console.log("copying static assets for Vercel...");
+    await rm("public", { recursive: true, force: true });
+    await cp("dist/public", "public", { recursive: true });
+  }
 }
 
 buildAll().catch((err) => {
