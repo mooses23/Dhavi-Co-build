@@ -1,0 +1,83 @@
+19:06:54.490 Running build in Washington, D.C., USA (East) – iad1
+19:06:54.491 Build machine configuration: 2 cores, 8 GB
+19:06:54.500 Cloning github.com/mooses23/Dhavi-Co-build (Branch: main, Commit: ec92c72)
+19:06:54.501 Skipping build cache, deployment was triggered without cache.
+19:06:55.656 Cloning completed: 1.154s
+19:06:55.685 Found .vercelignore
+19:06:55.686 Removed 0 ignored files defined in .vercelignore
+19:06:56.033 Running "vercel build"
+19:06:57.574 Vercel CLI 50.4.10
+19:06:58.832 > Installing Builder: @vercel/node@3.2.0
+19:07:13.709 Running "install" command: `npm install`...
+19:07:25.436 
+19:07:25.436 added 595 packages, and audited 596 packages in 12s
+19:07:25.437 
+19:07:25.437 87 packages are looking for funding
+19:07:25.437   run `npm fund` for details
+19:07:25.454 
+19:07:25.454 4 vulnerabilities (2 moderate, 2 high)
+19:07:25.455 
+19:07:25.455 To address issues that do not require attention, run:
+19:07:25.455   npm audit fix
+19:07:25.455 
+19:07:25.456 To address all issues (including breaking changes), run:
+19:07:25.456   npm audit fix --force
+19:07:25.456 
+19:07:25.456 Run `npm audit` for details.
+19:07:25.704 
+19:07:25.707 > rest-express@1.0.0 build
+19:07:25.708 > tsx script/build.ts
+19:07:25.708 
+19:07:26.685 building client...
+19:07:26.760 [36mvite v7.3.0 [32mbuilding client environment for production...[36m[39m
+19:07:27.343 transforming...
+19:07:28.876 
+19:07:28.877 A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+19:07:33.331 [32m✓[39m 2574 modules transformed.
+19:07:33.770 rendering chunks...
+19:07:33.783 computing gzip size...
+19:07:33.823 [2m../dist/public/[22m[32mindex.html                 [39m[1m[2m  2.22 kB[22m[1m[22m[2m │ gzip:   0.88 kB[22m
+19:07:33.824 [2m../dist/public/[22m[2massets/[22m[35mindex-CfvchYio.css  [39m[1m[2m 76.96 kB[22m[1m[22m[2m │ gzip:  12.52 kB[22m
+19:07:33.824 [2m../dist/public/[22m[2massets/[22m[36mindex-DlTvxpe4.js   [39m[1m[33m581.10 kB[39m[22m[2m │ gzip: 173.41 kB[22m
+19:07:33.824 [32m✓ built in 6.81s[39m
+19:07:33.825 building server...
+19:07:33.825 [33m
+19:07:33.825 (!) Some chunks are larger than 500 kB after minification. Consider:
+19:07:33.825 - Using dynamic import() to code-split the application
+19:07:33.825 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+19:07:33.826 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+19:07:34.073 
+19:07:34.075   dist/index.cjs  1.2mb ⚠️
+19:07:34.076 
+19:07:34.076 ⚡ Done in 252ms
+19:07:34.076 copying static assets for Vercel...
+19:07:34.174 Installing dependencies...
+19:07:35.432 
+19:07:35.432 up to date in 1s
+19:07:35.433 
+19:07:35.433 87 packages are looking for funding
+19:07:35.433   run `npm fund` for details
+19:07:35.649 Using TypeScript 5.6.3 (local user-provided)
+19:07:42.859 server/routes.ts(227,44): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+19:07:42.859   Type 'string[]' is not assignable to type 'string'.
+19:07:42.860 server/routes.ts(294,60): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+19:07:42.860   Type 'string[]' is not assignable to type 'string'.
+19:07:42.860 server/routes.ts(358,51): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+19:07:42.860   Type 'string[]' is not assignable to type 'string'.
+19:07:42.860 server/routes.ts(406,57): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+19:07:42.860   Type 'string[]' is not assignable to type 'string'.
+19:07:42.860 server/routes.ts(454,53): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+19:07:42.860   Type 'string[]' is not assignable to type 'string'.
+19:07:42.860 server/routes.ts(520,44): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+19:07:42.860   Type 'string[]' is not assignable to type 'string'.
+19:07:42.860 server/routes.ts(529,56): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+19:07:42.860   Type 'string[]' is not assignable to type 'string'.
+19:07:42.861 server/routes.ts(572,60): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+19:07:42.861   Type 'string[]' is not assignable to type 'string'.
+19:07:42.861 server/routes.ts(627,48): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+19:07:42.861   Type 'string[]' is not assignable to type 'string'.
+19:07:42.861 server/routes.ts(647,57): error TS2345: Argument of type 'string | string[]' is not assignable to parameter of type 'string'.
+19:07:42.861   Type 'string[]' is not assignable to type 'string'.
+19:07:42.861 
+19:07:45.914 Build Completed in /vercel/output [32s]
+19:07:46.107 Deploying outputs...
