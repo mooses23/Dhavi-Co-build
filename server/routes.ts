@@ -172,7 +172,7 @@ export async function registerRoutes(
   // Get order by ID (public - for confirmation page)
   app.get("/api/orders/:id", async (req, res) => {
     try {
-      const order = await storage.getOrder(req.params.id);
+      const order = await storage.getOrder(req.params.id as string);
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
@@ -224,7 +224,7 @@ export async function registerRoutes(
       }
 
       const { status } = parseResult.data;
-      const order = await storage.getOrder(req.params.id);
+      const order = await storage.getOrder(req.params.id as string);
       
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
@@ -291,7 +291,7 @@ export async function registerRoutes(
         }
       }
 
-      const updatedOrder = await storage.updateOrderStatus(req.params.id, status);
+      const updatedOrder = await storage.updateOrderStatus(req.params.id as string, status);
       res.json(updatedOrder);
     } catch (error) {
       console.error("Error updating order status:", error);
@@ -355,7 +355,7 @@ export async function registerRoutes(
           errors: parseResult.error.errors 
         });
       }
-      const product = await storage.updateProduct(req.params.id, parseResult.data);
+      const product = await storage.updateProduct(req.params.id as string, parseResult.data);
       res.json(product);
     } catch (error) {
       console.error("Error updating product:", error);
@@ -403,7 +403,7 @@ export async function registerRoutes(
           errors: parseResult.error.errors 
         });
       }
-      const ingredient = await storage.updateIngredient(req.params.id, parseResult.data);
+      const ingredient = await storage.updateIngredient(req.params.id as string, parseResult.data);
       res.json(ingredient);
     } catch (error) {
       console.error("Error updating ingredient:", error);
@@ -451,7 +451,7 @@ export async function registerRoutes(
           errors: parseResult.error.errors 
         });
       }
-      const location = await storage.updateLocation(req.params.id, parseResult.data);
+      const location = await storage.updateLocation(req.params.id as string, parseResult.data);
       res.json(location);
     } catch (error) {
       console.error("Error updating location:", error);
@@ -517,7 +517,7 @@ export async function registerRoutes(
       }
 
       const { status } = parseResult.data;
-      const batch = await storage.getBatch(req.params.id);
+      const batch = await storage.getBatch(req.params.id as string);
       
       if (!batch) {
         return res.status(404).json({ message: "Batch not found" });
@@ -526,7 +526,7 @@ export async function registerRoutes(
       // When completing a batch, deduct ingredients based on BOM
       if (status === "completed" && batch.status !== "completed") {
         // Get batch items directly
-        const batchItems = await storage.getBatchItems(req.params.id);
+        const batchItems = await storage.getBatchItems(req.params.id as string);
         
         if (batchItems && batchItems.length > 0) {
           const deductions: { ingredientId: string; quantity: number }[] = [];
@@ -569,7 +569,7 @@ export async function registerRoutes(
         }
       }
 
-      const updatedBatch = await storage.updateBatchStatus(req.params.id, status);
+      const updatedBatch = await storage.updateBatchStatus(req.params.id as string, status);
       res.json(updatedBatch);
     } catch (error) {
       console.error("Error updating batch status:", error);
@@ -624,7 +624,7 @@ export async function registerRoutes(
   // Admin: Get single invoice
   app.get("/api/admin/invoices/:id", isAuthenticated, async (req, res) => {
     try {
-      const invoice = await storage.getInvoice(req.params.id);
+      const invoice = await storage.getInvoice(req.params.id as string);
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
@@ -644,7 +644,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid status" });
       }
 
-      const invoice = await storage.updateInvoiceStatus(req.params.id, parseResult.data.status);
+      const invoice = await storage.updateInvoiceStatus(req.params.id as string, parseResult.data.status);
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
