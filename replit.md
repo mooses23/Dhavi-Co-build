@@ -9,7 +9,7 @@ D'havi.co is a production-ready web application for a premium small-batch spelt 
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS + shadcn/ui
 - **Backend**: Express.js + TypeScript
 - **Database**: PostgreSQL with Drizzle ORM
-- **Authentication**: Replit Auth (OpenID Connect)
+- **Authentication**: Simple username/password (Baker's Login)
 - **Payments**: Stripe (PaymentIntents with manual capture)
 
 ### Portability Notes (Vercel/Supabase)
@@ -39,7 +39,8 @@ To deploy to Vercel:
 - Select pickup location and date/time window
 - Stripe authorization (manual capture) - card is authorized but not charged until admin approves
 
-### 2. Admin Dashboard (Protected)
+### 2. Bakehouse Dashboard (Protected via Baker's Login)
+- Access via `/bakers-login` with credentials: Username "Dhavi.co", Password "SpeltBagels"
 - **Orders Queue**: View, approve, reject orders. Approving captures payment.
 - **Production Planner**: Schedule batches, track production runs
 - **Inventory Management**: Track ingredients with reorder alerts
@@ -61,24 +62,24 @@ client/
       order.tsx            - Public order form
       checkout.tsx         - Stripe payment page
       order-confirmation.tsx - Order confirmation
+      bakers-login.tsx     - Baker's Login page
       admin/
-        dashboard.tsx      - Admin dashboard
-        orders.tsx         - Order management
-        production.tsx     - Batch production
-        products.tsx       - Product catalog
-        ingredients.tsx    - Ingredient inventory
-        locations.tsx      - Location management
-        marketing.tsx      - Brand assets
+        dashboard.tsx      - Bakehouse dashboard (route: /bakehouse)
+        orders.tsx         - Order management (route: /bakehouse/orders)
+        production.tsx     - Batch production (route: /bakehouse/production)
+        products.tsx       - Product catalog (route: /bakehouse/products)
+        ingredients.tsx    - Ingredient inventory (route: /bakehouse/ingredients)
+        locations.tsx      - Location management (route: /bakehouse/locations)
+        marketing.tsx      - Brand assets (route: /bakehouse/marketing)
     components/
-      app-sidebar.tsx      - Admin navigation
+      app-sidebar.tsx      - Bakehouse navigation
       theme-toggle.tsx     - Dark/light mode toggle
 
 server/
   routes.ts               - API endpoints
   storage.ts              - Database operations
   db.ts                   - Database connection
-  replit_integrations/
-    auth/                 - Replit Auth integration
+  simpleAuth.ts           - Simple session-based authentication
 
 shared/
   schema.ts               - Drizzle database schema
