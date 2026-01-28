@@ -1,0 +1,66 @@
+21:56:28.819 Running build in Washington, D.C., USA (East) – iad1
+21:56:28.819 Build machine configuration: 2 cores, 8 GB
+21:56:28.954 Cloning github.com/mooses23/Dhavi-Co-build (Branch: main, Commit: 52bcec4)
+21:56:30.562 Cloning completed: 1.608s
+21:56:30.599 Found .vercelignore
+21:56:30.600 Removed 0 ignored files defined in .vercelignore
+21:56:30.658 Restored build cache from previous deployment (2SaireiZsaQYMaBrAwSTMykm32Y5)
+21:56:30.975 Running "vercel build"
+21:56:32.069 Vercel CLI 50.5.2
+21:56:33.114 Running "install" command: `npm install`...
+21:56:35.494 
+21:56:35.495 up to date, audited 596 packages in 2s
+21:56:35.496 
+21:56:35.496 87 packages are looking for funding
+21:56:35.497   run `npm fund` for details
+21:56:35.515 
+21:56:35.515 4 vulnerabilities (2 moderate, 2 high)
+21:56:35.516 
+21:56:35.516 To address issues that do not require attention, run:
+21:56:35.516   npm audit fix
+21:56:35.516 
+21:56:35.516 To address all issues (including breaking changes), run:
+21:56:35.517   npm audit fix --force
+21:56:35.517 
+21:56:35.517 Run `npm audit` for details.
+21:56:35.760 
+21:56:35.763 > rest-express@1.0.0 build
+21:56:35.764 > tsx script/build.ts
+21:56:35.764 
+21:56:36.857 building client...
+21:56:36.965 [36mvite v7.3.0 [32mbuilding client environment for production...[36m[39m
+21:56:37.678 transforming...
+21:56:39.306 
+21:56:39.307 A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+21:56:44.081 [32m✓[39m 2685 modules transformed.
+21:56:44.561 rendering chunks...
+21:56:44.571 computing gzip size...
+21:56:44.659 [2m../dist/public/[22m[32mindex.html                 [39m[1m[2m  2.22 kB[22m[1m[22m[2m │ gzip:   0.88 kB[22m
+21:56:44.659 [2m../dist/public/[22m[2massets/[22m[35mindex-CnYnWm0u.css  [39m[1m[2m 77.71 kB[22m[1m[22m[2m │ gzip:  12.66 kB[22m
+21:56:44.660 [2m../dist/public/[22m[2massets/[22m[36mindex-SSY04wc8.js   [39m[1m[33m653.31 kB[39m[22m[2m │ gzip: 192.19 kB[22m
+21:56:44.660 [33m
+21:56:44.660 (!) Some chunks are larger than 500 kB after minification. Consider:
+21:56:44.660 - Using dynamic import() to code-split the application
+21:56:44.660 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+21:56:44.660 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+21:56:44.661 [32m✓ built in 7.40s[39m
+21:56:44.661 building server...
+21:56:44.956 
+21:56:44.957   dist/index.cjs  1.2mb ⚠️
+21:56:44.957 
+21:56:44.957 ⚡ Done in 286ms
+21:56:44.958 copying static assets for Vercel...
+21:56:45.043 Installing dependencies...
+21:56:46.264 
+21:56:46.264 up to date in 1s
+21:56:46.265 
+21:56:46.266 87 packages are looking for funding
+21:56:46.266   run `npm fund` for details
+21:56:46.471 Using TypeScript 5.6.3 (local user-provided)
+21:56:56.632 Build Completed in /vercel/output [24s]
+21:56:56.858 Deploying outputs...
+21:57:02.575 Deployment completed
+21:57:03.440 Creating build cache...
+21:57:27.896 Created build cache: 24.454s
+21:57:27.897 Uploading build cache [107.36 MB]
+21:57:29.492 Build cache uploaded: 1.595s
