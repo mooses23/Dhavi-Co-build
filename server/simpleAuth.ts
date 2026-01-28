@@ -24,6 +24,24 @@ declare module "express-session" {
 export function setupSimpleAuth(app: Express) {
   app.set("trust proxy", 1);
   
+  // Test database connection on startup
+  pool.query("SELECT 1").then(() => {
+    console.log("Database connection successful");
+    // Try to ensure session table exists
+    return pool.query(`
+      CREATE TABLE IF NOT EXISTS "session" (
+        "sid" varchar NOT NULL COLLATE "default",
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
+      )
+    `);
+  }).then(() => {
+    console.log("Session table ready");
+  }).catch((error) => {
+    console.error("Database setup error:", error);
+  });
+  
   const sessionStore = new PgSession({
     pool: pool,
     tableName: "session",
@@ -31,13 +49,6 @@ export function setupSimpleAuth(app: Express) {
     errorLog: (error) => {
       console.error("Session store error:", error);
     },
-  });
-  
-  // Test database connection on startup
-  pool.query("SELECT 1").then(() => {
-    console.log("Database connection successful");
-  }).catch((error) => {
-    console.error("Database connection failed:", error);
   });
   
   app.use(
