@@ -1,7 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { pool } from "./db.js";
+import { getPool } from "./db.js";
 
 const VALID_USERNAME = "Dhavi.co";
 const VALID_PASSWORD = "SpeltBagels";
@@ -25,6 +25,7 @@ export async function setupSimpleAuth(app: Express) {
   app.set("trust proxy", 1);
   
   // Test database connection and ensure session table exists before setting up session store
+  const pool = getPool();
   try {
     await pool.query("SELECT 1");
     console.log("Database connection successful");

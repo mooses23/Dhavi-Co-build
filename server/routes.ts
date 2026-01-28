@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage.js";
 import { setupSimpleAuth, registerSimpleAuthRoutes, isSimpleAuthenticated } from "./simpleAuth.js";
-import { pool } from "./db.js";
+import { getPool } from "./db.js";
 import Stripe from "stripe";
 import { z } from "zod";
 import { insertIngredientSchema, insertProductSchema, insertLocationSchema, insertBatchSchema } from "../shared/schema.js";
@@ -61,7 +61,7 @@ export async function registerRoutes(
   app.get("/api/health", async (req, res) => {
     try {
       // Check database connection
-      await pool.query("SELECT 1");
+      await getPool().query("SELECT 1");
       
       res.json({
         status: "ok",
