@@ -58,6 +58,9 @@ To deploy to Vercel:
 - **Activity Logging**: Added activity_logs table for audit trail (order.approved, batch.completed, etc.)
 - **Batch Completion Flow**: Enhanced to automatically add products to freezer stock and log activities
 - **Zustand Store**: Added client-side admin state management to reduce prop drilling
+- **Analytics Dashboard**: New `/bakehouse/analytics` page with Recharts visualizations for orders, inventory, and production trends
+- **Server-Side Pagination**: Orders and batches endpoints now return paginated responses with `{items/batches/orders, pagination}` format
+- **UI Panels**: Added FreezerStockPanel and ActivityLogPanel components to dashboard
 
 ## File Structure
 
@@ -78,6 +81,10 @@ client/
         ingredients.tsx    - Ingredient inventory (route: /bakehouse/ingredients)
         locations.tsx      - Location management (route: /bakehouse/locations)
         marketing.tsx      - Brand assets (route: /bakehouse/marketing)
+        analytics.tsx      - Analytics dashboard (route: /bakehouse/analytics)
+        components/
+          FreezerStockPanel.tsx  - Freezer stock display panel
+          ActivityLogPanel.tsx   - Activity log display panel
     stores/
       adminStore.ts        - Zustand store for admin state management
     components/
