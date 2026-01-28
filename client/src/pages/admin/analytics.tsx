@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Order, Ingredient, Batch } from "@shared/schema";
-import { format, subDays, startOfDay, isWithinInterval } from "date-fns";
+import { format, subDays, startOfDay } from "date-fns";
 import {
   BarChart,
   Bar,
@@ -18,9 +19,21 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  AreaChart,
+  Area,
 } from "recharts";
+import { Snowflake, Factory, TrendingUp, Package, AlertTriangle } from "lucide-react";
 
-const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--muted))", "#10b981", "#f59e0b", "#ef4444"];
+const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+
+type FreezerStock = {
+  id: string;
+  productId: string;
+  quantity: number;
+  batchId?: string;
+  createdAt: string;
+  product: { name: string };
+};
 
 export default function Analytics() {
   const { data: ordersResponse, isLoading: ordersLoading } = useQuery<{ orders: Order[]; pagination: any } | Order[]>({
@@ -38,6 +51,10 @@ export default function Analytics() {
   });
 
   const batches = Array.isArray(batchesResponse) ? batchesResponse : (batchesResponse?.batches || []);
+
+  const { data: freezerStock, isLoading: freezerLoading } = useQuery<FreezerStock[]>({
+    queryKey: ["/api/admin/freezer"],
+  });
 
   const { data: freezerStats } = useQuery<{
     totalItems: number;
@@ -89,20 +106,62 @@ export default function Analytics() {
   }, {} as Record<string, number>) || {};
 
   const batchStatusData = Object.entries(batchesByStatus).map(([status, count]) => ({
-    name: status.charAt(0).toUpperCase() + status.slice(1),
+    name: status.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase()),
     value: count,
   }));
 
-  const inventoryData = ingredients?.slice(0, 10).map((ing) => ({
+  const batchesByDay = last7Days.map((day) => {
+    const dayBatches = batches?.filter((batch) => {
+      if (!batch.batchDate) return false;
+      const batchDate = startOfDay(new Date(batch.batchDate));
+      return batchDate.getTime() === day.fullDate.getTime();
+    }) || [];
+
+    const completedBatches = dayBatches.filter(b => b.status === "completed");
+    const totalQuantity = completedBatches.reduce((sum, b) => {
+      return sum + (b.items?.reduce((itemSum: number, item: any) => itemSum + (item.quantity || 0), 0) || 0);
+    }, 0);
+
+    return {
+      date: day.date,
+      batches: dayBatches.length,
+      completed: completedBatches.length,
+      produced: totalQuantity,
+    };
+  });
+
+  const freezerByProduct = freezerStock?.reduce((acc, item) => {
+    const productName = item.product?.name || "Unknown";
+    if (!acc[productName]) {
+      acc[productName] = 0;
+    }
+    acc[productName] += item.quantity;
+    return acc;
+  }, {} as Record<string, number>) || {};
+
+  const freezerChartData = Object.entries(freezerByProduct)
+    .map(([name, quantity]) => ({
+      name: name.length > 15 ? name.substring(0, 15) + "..." : name,
+      fullName: name,
+      quantity,
+    }))
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, 8);
+
+  const lowStockIngredients = ingredients?.filter(i => 
+    parseFloat(i.onHand) <= parseFloat(i.reorderThreshold)
+  ) || [];
+
+  const ingredientUsageData = ingredients?.slice(0, 8).map((ing) => ({
     name: ing.name.length > 12 ? ing.name.substring(0, 12) + "..." : ing.name,
+    fullName: ing.name,
     onHand: parseFloat(ing.onHand),
     reorderAt: parseFloat(ing.reorderThreshold),
+    unit: ing.unit,
   })) || [];
 
-  const freezerData = freezerStats?.productBreakdown?.slice(0, 8).map((item) => ({
-    name: item.productName.length > 15 ? item.productName.substring(0, 15) + "..." : item.productName,
-    quantity: item.totalQuantity,
-  })) || [];
+  const totalFreezerItems = freezerStock?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+  const uniqueProductsInFreezer = new Set(freezerStock?.map(item => item.productId) || []).size;
 
   const isLoading = ordersLoading || ingredientsLoading || batchesLoading;
 
@@ -117,16 +176,26 @@ export default function Analytics() {
 
       <Tabs defaultValue="orders" className="space-y-6">
         <TabsList data-testid="tabs-analytics">
-          <TabsTrigger value="orders" data-testid="tab-orders">Orders</TabsTrigger>
-          <TabsTrigger value="inventory" data-testid="tab-inventory">Inventory</TabsTrigger>
-          <TabsTrigger value="production" data-testid="tab-production">Production</TabsTrigger>
+          <TabsTrigger value="orders" data-testid="tab-orders">
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Orders
+          </TabsTrigger>
+          <TabsTrigger value="freezer" data-testid="tab-freezer">
+            <Snowflake className="h-4 w-4 mr-2" />
+            Freezer
+          </TabsTrigger>
+          <TabsTrigger value="bake" data-testid="tab-bake">
+            <Factory className="h-4 w-4 mr-2" />
+            Bake
+          </TabsTrigger>
         </TabsList>
 
+        {/* ORDERS TAB */}
         <TabsContent value="orders" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
-            <Card>
+            <Card data-testid="card-orders-7-days">
               <CardHeader>
-                <CardTitle>Orders (Last 7 Days)</CardTitle>
+                <CardTitle data-testid="title-orders-7-days">Orders (Last 7 Days)</CardTitle>
                 <CardDescription>Daily order volume</CardDescription>
               </CardHeader>
               <CardContent>
@@ -152,9 +221,9 @@ export default function Analytics() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card data-testid="card-revenue-7-days">
               <CardHeader>
-                <CardTitle>Revenue (Last 7 Days)</CardTitle>
+                <CardTitle data-testid="title-revenue-7-days">Revenue (Last 7 Days)</CardTitle>
                 <CardDescription>Daily revenue trend</CardDescription>
               </CardHeader>
               <CardContent>
@@ -162,7 +231,7 @@ export default function Analytics() {
                   <Skeleton className="h-[300px] w-full" />
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={ordersByDay}>
+                    <AreaChart data={ordersByDay}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis dataKey="date" className="text-xs" />
                       <YAxis className="text-xs" tickFormatter={(v) => `$${v}`} />
@@ -174,28 +243,32 @@ export default function Analytics() {
                           borderRadius: "8px",
                         }}
                       />
-                      <Line
+                      <Area
                         type="monotone"
                         dataKey="revenue"
                         stroke="hsl(var(--primary))"
+                        fill="hsl(var(--primary)/0.2)"
                         strokeWidth={2}
-                        dot={{ fill: "hsl(var(--primary))" }}
                       />
-                    </LineChart>
+                    </AreaChart>
                   </ResponsiveContainer>
                 )}
               </CardContent>
             </Card>
           </div>
 
-          <Card>
+          <Card data-testid="card-order-status-distribution">
             <CardHeader>
-              <CardTitle>Order Status Distribution</CardTitle>
+              <CardTitle data-testid="title-order-status-distribution">Order Status Distribution</CardTitle>
               <CardDescription>Current status breakdown</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[300px] w-full" />
+              ) : statusData.length === 0 ? (
+                <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+                  No orders yet
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
@@ -228,55 +301,194 @@ export default function Analytics() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="inventory" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Ingredient Stock Levels</CardTitle>
-                <CardDescription>Current on-hand vs reorder threshold</CardDescription>
+        {/* FREEZER TAB */}
+        <TabsContent value="freezer" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card data-testid="card-freezer-total">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium" data-testid="label-freezer-total">Total Units</CardTitle>
+                <Snowflake className="h-4 w-4 text-blue-400" />
               </CardHeader>
               <CardContent>
-                {ingredientsLoading ? (
+                <div className="text-2xl font-bold" data-testid="text-freezer-total">{totalFreezerItems}</div>
+                <p className="text-xs text-muted-foreground">bagels in freezer</p>
+              </CardContent>
+            </Card>
+            <Card data-testid="card-freezer-products">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium" data-testid="label-freezer-products">Product Types</CardTitle>
+                <Package className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-freezer-products">{uniqueProductsInFreezer}</div>
+                <p className="text-xs text-muted-foreground">different products</p>
+              </CardContent>
+            </Card>
+            <Card data-testid="card-stock-status">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium" data-testid="label-stock-status">Stock Status</CardTitle>
+                {totalFreezerItems > 0 ? (
+                  <TrendingUp className="h-4 w-4 text-green-500" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                )}
+              </CardHeader>
+              <CardContent>
+                <div 
+                  className={`text-2xl font-bold ${totalFreezerItems > 0 ? "text-green-500" : "text-muted-foreground"}`} 
+                  data-testid="text-freezer-status"
+                >
+                  {totalFreezerItems > 0 ? "Stocked" : "Empty"}
+                </div>
+                <p className="text-xs text-muted-foreground">freezer inventory level</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card data-testid="card-freezer-stock-product">
+              <CardHeader>
+                <CardTitle data-testid="title-freezer-stock-product">Freezer Stock by Product</CardTitle>
+                <CardDescription>Finished goods inventory breakdown</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {freezerLoading ? (
                   <Skeleton className="h-[350px] w-full" />
+                ) : freezerChartData.length === 0 ? (
+                  <div className="flex h-[350px] items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <Snowflake className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <p>No items in freezer</p>
+                      <p className="text-sm">Complete batches to stock the freezer</p>
+                    </div>
+                  </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={350}>
-                    <BarChart data={inventoryData} layout="vertical">
+                    <BarChart data={freezerChartData} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis type="number" className="text-xs" />
-                      <YAxis dataKey="name" type="category" className="text-xs" width={100} />
+                      <YAxis dataKey="name" type="category" className="text-xs" width={120} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
                           border: "1px solid hsl(var(--border))",
                           borderRadius: "8px",
                         }}
+                        formatter={(value: number, name: string, props: any) => [
+                          `${value} units`,
+                          props.payload.fullName
+                        ]}
                       />
-                      <Legend />
-                      <Bar dataKey="onHand" fill="hsl(var(--primary))" name="On Hand" radius={[0, 4, 4, 0]} />
-                      <Bar dataKey="reorderAt" fill="hsl(var(--destructive))" name="Reorder At" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="quantity" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
               </CardContent>
             </Card>
 
-            <Card>
+            <Card data-testid="card-freezer-inventory-list">
               <CardHeader>
-                <CardTitle>Freezer Stock</CardTitle>
-                <CardDescription>Finished goods inventory</CardDescription>
+                <CardTitle data-testid="title-freezer-inventory-list">Freezer Inventory List</CardTitle>
+                <CardDescription>All items currently in storage</CardDescription>
               </CardHeader>
               <CardContent>
-                {!freezerStats ? (
+                {freezerLoading ? (
                   <Skeleton className="h-[350px] w-full" />
-                ) : freezerData.length === 0 ? (
+                ) : !freezerStock || freezerStock.length === 0 ? (
                   <div className="flex h-[350px] items-center justify-center text-muted-foreground">
-                    No freezer stock data available
+                    No freezer stock entries
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height={350}>
-                    <BarChart data={freezerData}>
+                  <div className="space-y-3 max-h-[350px] overflow-y-auto">
+                    {freezerStock.slice(0, 15).map((item, index) => (
+                      <div
+                        key={item.id || index}
+                        className="flex items-center justify-between p-3 rounded-md bg-muted/50"
+                        data-testid={`freezer-item-${index}`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{item.product?.name || "Unknown"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Added {format(new Date(item.createdAt), "MMM d, yyyy")}
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="ml-2">
+                          {item.quantity} units
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* BAKE TAB */}
+        <TabsContent value="bake" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card data-testid="card-total-batches">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium" data-testid="label-total-batches">Total Batches</CardTitle>
+                <Factory className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-batches">{batches.length}</div>
+                <p className="text-xs text-muted-foreground">all time</p>
+              </CardContent>
+            </Card>
+            <Card data-testid="card-completed-batches">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium" data-testid="label-completed-batches">Completed</CardTitle>
+                <Package className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-500" data-testid="text-completed-batches">
+                  {batches.filter(b => b.status === "completed").length}
+                </div>
+                <p className="text-xs text-muted-foreground">finished batches</p>
+              </CardContent>
+            </Card>
+            <Card data-testid="card-inprogress-batches">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium" data-testid="label-inprogress-batches">In Progress</CardTitle>
+                <Factory className="h-4 w-4 text-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-yellow-500" data-testid="text-inprogress-batches">
+                  {batches.filter(b => b.status === "in_progress").length}
+                </div>
+                <p className="text-xs text-muted-foreground">currently baking</p>
+              </CardContent>
+            </Card>
+            <Card data-testid="card-low-stock-alerts">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium" data-testid="label-low-stock-alerts">Low Stock Alerts</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-destructive" data-testid="text-low-stock">
+                  {lowStockIngredients.length}
+                </div>
+                <p className="text-xs text-muted-foreground">ingredients need reorder</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card data-testid="card-production-chart">
+              <CardHeader>
+                <CardTitle data-testid="title-production-chart">Production (Last 7 Days)</CardTitle>
+                <CardDescription>Daily batch activity</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {batchesLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={batchesByDay}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="name" className="text-xs" angle={-45} textAnchor="end" height={80} />
+                      <XAxis dataKey="date" className="text-xs" />
                       <YAxis className="text-xs" />
                       <Tooltip
                         contentStyle={{
@@ -285,28 +497,30 @@ export default function Analytics() {
                           borderRadius: "8px",
                         }}
                       />
-                      <Bar dataKey="quantity" fill="hsl(var(--accent))" name="Quantity" radius={[4, 4, 0, 0]} />
+                      <Legend />
+                      <Bar dataKey="batches" fill="hsl(var(--primary))" name="Scheduled" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="completed" fill="#10b981" name="Completed" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
               </CardContent>
             </Card>
-          </div>
-        </TabsContent>
 
-        <TabsContent value="production" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
+            <Card data-testid="card-batch-status-distribution">
               <CardHeader>
-                <CardTitle>Batch Status</CardTitle>
-                <CardDescription>Production batch distribution</CardDescription>
+                <CardTitle data-testid="title-batch-status-distribution">Batch Status Distribution</CardTitle>
+                <CardDescription>Current batch states</CardDescription>
               </CardHeader>
               <CardContent>
                 {batchesLoading ? (
                   <Skeleton className="h-[300px] w-full" />
                 ) : batchStatusData.length === 0 ? (
                   <div className="flex h-[300px] items-center justify-center text-muted-foreground">
-                    No batch data available
+                    <div className="text-center">
+                      <Factory className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                      <p>No batches scheduled</p>
+                      <p className="text-sm">Create a batch to start production</p>
+                    </div>
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={300}>
@@ -338,42 +552,76 @@ export default function Analytics() {
                 )}
               </CardContent>
             </Card>
+          </div>
 
-            <Card>
+          <Card data-testid="card-ingredient-stock-levels">
+            <CardHeader>
+              <CardTitle data-testid="title-ingredient-stock-levels">Ingredient Stock Levels</CardTitle>
+              <CardDescription>Current on-hand vs reorder threshold</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {ingredientsLoading ? (
+                <Skeleton className="h-[300px] w-full" />
+              ) : ingredientUsageData.length === 0 ? (
+                <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+                  No ingredients tracked yet
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={ingredientUsageData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis type="number" className="text-xs" />
+                    <YAxis dataKey="name" type="category" className="text-xs" width={100} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number, name: string, props: any) => [
+                        `${value} ${props.payload.unit}`,
+                        name === "onHand" ? "On Hand" : "Reorder At"
+                      ]}
+                    />
+                    <Legend />
+                    <Bar dataKey="onHand" fill="hsl(var(--primary))" name="On Hand" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="reorderAt" fill="hsl(var(--destructive))" name="Reorder At" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {lowStockIngredients.length > 0 && (
+            <Card className="border-destructive/50" data-testid="card-low-stock-section">
               <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest system events</CardDescription>
+                <CardTitle className="flex items-center gap-2 text-destructive" data-testid="title-low-stock-section">
+                  <AlertTriangle className="h-5 w-5" />
+                  Low Stock Alerts
+                </CardTitle>
+                <CardDescription>Ingredients below reorder threshold</CardDescription>
               </CardHeader>
               <CardContent>
-                {!activityLogs ? (
-                  <Skeleton className="h-[300px] w-full" />
-                ) : activityLogs.length === 0 ? (
-                  <div className="flex h-[300px] items-center justify-center text-muted-foreground">
-                    No activity recorded yet
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                    {activityLogs.slice(0, 10).map((log: any, index: number) => (
-                      <div
-                        key={log.id || index}
-                        className="flex items-start gap-3 p-3 rounded-md bg-muted/50"
-                        data-testid={`activity-log-${index}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {log.actionType.replace(".", " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(log.createdAt), "MMM d, h:mm a")}
-                          </p>
-                        </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {lowStockIngredients.map((ing) => (
+                    <div
+                      key={ing.id}
+                      className="flex items-center justify-between p-3 rounded-md bg-destructive/10 border border-destructive/20"
+                      data-testid={`low-stock-${ing.id}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm truncate">{ing.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {ing.onHand} / {ing.reorderThreshold} {ing.unit}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <Badge variant="destructive" className="ml-2">Low</Badge>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
-          </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
