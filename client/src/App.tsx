@@ -19,13 +19,10 @@ import BakersLogin from "@/pages/bakers-login";
 
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminOrders from "@/pages/admin/orders";
-import AdminInvoices from "@/pages/admin/invoices";
-import AdminProduction from "@/pages/admin/production";
-import AdminProducts from "@/pages/admin/products";
-import AdminIngredients from "@/pages/admin/ingredients";
+import AdminBake from "@/pages/admin/bake";
+import AdminFreezer from "@/pages/admin/freezer";
+import AdminPantry from "@/pages/admin/pantry";
 import AdminLocations from "@/pages/admin/locations";
-import AdminMarketing from "@/pages/admin/marketing";
-import AdminAnalytics from "@/pages/admin/analytics";
 
 function PublicRoutes() {
   return (
@@ -86,13 +83,10 @@ function BakehouseRoutes() {
       <Switch>
         <Route path="/bakehouse" component={AdminDashboard} />
         <Route path="/bakehouse/orders" component={AdminOrders} />
-        <Route path="/bakehouse/invoices" component={AdminInvoices} />
-        <Route path="/bakehouse/production" component={AdminProduction} />
-        <Route path="/bakehouse/products" component={AdminProducts} />
-        <Route path="/bakehouse/ingredients" component={AdminIngredients} />
+        <Route path="/bakehouse/bake" component={AdminBake} />
+        <Route path="/bakehouse/freezer" component={AdminFreezer} />
+        <Route path="/bakehouse/pantry" component={AdminPantry} />
         <Route path="/bakehouse/locations" component={AdminLocations} />
-        <Route path="/bakehouse/marketing" component={AdminMarketing} />
-        <Route path="/bakehouse/analytics" component={AdminAnalytics} />
         <Route component={NotFound} />
       </Switch>
     </AdminLayout>

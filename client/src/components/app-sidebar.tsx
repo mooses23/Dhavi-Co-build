@@ -13,15 +13,12 @@ import {
 } from "@/components/ui/sidebar";
 import {
   ShoppingCart,
-  Package,
-  Wheat,
+  Snowflake,
+  Warehouse,
   MapPin,
-  Factory,
+  ChefHat,
   LayoutDashboard,
-  Image,
-  FileText,
   LogOut,
-  BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -38,39 +35,24 @@ const menuItems = [
     icon: ShoppingCart,
   },
   {
-    title: "Invoices",
-    url: "/bakehouse/invoices",
-    icon: FileText,
+    title: "Bake",
+    url: "/bakehouse/bake",
+    icon: ChefHat,
   },
   {
-    title: "Production",
-    url: "/bakehouse/production",
-    icon: Factory,
+    title: "Freezer",
+    url: "/bakehouse/freezer",
+    icon: Snowflake,
   },
   {
-    title: "Products",
-    url: "/bakehouse/products",
-    icon: Package,
-  },
-  {
-    title: "Ingredients",
-    url: "/bakehouse/ingredients",
-    icon: Wheat,
+    title: "Pantry",
+    url: "/bakehouse/pantry",
+    icon: Warehouse,
   },
   {
     title: "Locations",
     url: "/bakehouse/locations",
     icon: MapPin,
-  },
-  {
-    title: "Marketing",
-    url: "/bakehouse/marketing",
-    icon: Image,
-  },
-  {
-    title: "Analytics",
-    url: "/bakehouse/analytics",
-    icon: BarChart3,
   },
 ];
 
