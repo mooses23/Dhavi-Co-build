@@ -10,25 +10,11 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Configure pool with better error handling and connection settings for Vercel serverless
 export const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
-  // Vercel serverless functions need smaller pool sizes
-  max: 1,
-  // Add connection timeout
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  max: 3,
+  idleTimeoutMillis: 20000,
   connectionTimeoutMillis: 10000,
-  // Short idle timeout for serverless - prevents stale connections with PgBouncer
-  idleTimeoutMillis: 5000,
-  // SSL configuration for Supabase - required for all Supabase connections
-  // Use secure default settings (rejectUnauthorized: true is implicit)
-  ssl: process.env.DATABASE_URL?.includes('supabase') || process.env.NODE_ENV === 'production' 
-    ? true 
-    : undefined,
 });
-
-// Handle pool errors
-pool.on('error', (err) => {
-  console.error('Unexpected database pool error:', err);
-});
-
 export const db = drizzle(pool, { schema });

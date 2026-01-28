@@ -43,7 +43,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup simple authentication (now async to ensure DB is ready)
+  // Setup simple authentication
   await setupSimpleAuth(app);
   registerSimpleAuthRoutes(app);
 

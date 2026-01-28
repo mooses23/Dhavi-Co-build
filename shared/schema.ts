@@ -406,3 +406,14 @@ export type AdjustmentType = typeof ADJUSTMENT_TYPES[number];
 
 export const INVOICE_STATUSES = ["draft", "sent", "paid", "cancelled"] as const;
 export type InvoiceStatus = typeof INVOICE_STATUSES[number];
+
+// ============================================
+// SESSION - Express session storage for serverless
+// ============================================
+export const session = pgTable("session", {
+  sid: varchar("sid").primaryKey(),
+  sess: jsonb("sess").notNull(),
+  expire: timestamp("expire", { precision: 6 }).notNull(),
+}, (table) => [
+  index("idx_session_expire").on(table.expire),
+]);

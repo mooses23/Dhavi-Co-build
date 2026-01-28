@@ -30,18 +30,19 @@ export async function setupSimpleAuth(app: Express) {
     console.log("Database connection successful");
     
     // Ensure session table exists with proper structure
+    // Using "sessions" to match the schema in shared/models/auth.ts
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS "session" (
+      CREATE TABLE IF NOT EXISTS "sessions" (
         "sid" varchar NOT NULL COLLATE "default",
         "sess" json NOT NULL,
         "expire" timestamp(6) NOT NULL,
-        CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
+        CONSTRAINT "sessions_pkey" PRIMARY KEY ("sid")
       )
     `);
     
     // Create index on expire column for faster session pruning
     await pool.query(`
-      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire")
+      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "sessions" ("expire")
     `);
     
     console.log("Session table ready");
@@ -52,7 +53,7 @@ export async function setupSimpleAuth(app: Express) {
   
   const sessionStore = new PgSession({
     pool: pool,
-    tableName: "session",
+    tableName: "sessions",
     // Disable auto table creation since we create it manually above
     createTableIfMissing: false,
     // Enable session pruning to clean up expired sessions (every 15 minutes)
