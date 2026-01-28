@@ -19,6 +19,7 @@ import {
   updateIngredient,
   getInventoryAdjustments,
   adjustIngredientInventory,
+  seedIngredients,
   getPublicLocations,
   getAllLocations,
   createLocation,
@@ -29,6 +30,7 @@ import {
   getAllOrders,
   updateOrderStatus,
   updateOrder,
+  createManualOrder,
   getAllBatches,
   createBatch,
   updateBatchStatus,
@@ -45,6 +47,7 @@ import {
   createFreezerStock,
   updateFreezerStock,
   getFreezerStats,
+  seedFreezerStock,
   getActivityLogs,
   getRecentActivity,
 } from "./controllers/index.js";
@@ -97,6 +100,7 @@ export async function registerRoutes(
 
   // Orders
   app.get("/api/admin/orders", isSimpleAuthenticated, getAllOrders);
+  app.post("/api/admin/orders/manual", isSimpleAuthenticated, createManualOrder);
   app.patch("/api/admin/orders/:id/status", isSimpleAuthenticated, updateOrderStatus);
   app.patch("/api/admin/orders/:id", isSimpleAuthenticated, updateOrder);
 
@@ -111,6 +115,7 @@ export async function registerRoutes(
   // Ingredients
   app.get("/api/admin/ingredients", isSimpleAuthenticated, getAllIngredients);
   app.post("/api/admin/ingredients", isSimpleAuthenticated, createIngredient);
+  app.post("/api/admin/ingredients/seed", isSimpleAuthenticated, seedIngredients);
   app.patch("/api/admin/ingredients/:id", isSimpleAuthenticated, updateIngredient);
   app.post("/api/admin/ingredients/:id/adjust", isSimpleAuthenticated, adjustIngredientInventory);
 
@@ -144,6 +149,7 @@ export async function registerRoutes(
   app.get("/api/admin/freezer", isSimpleAuthenticated, getFreezerStock);
   app.get("/api/admin/freezer/product/:productId", isSimpleAuthenticated, getFreezerStockByProduct);
   app.post("/api/admin/freezer", isSimpleAuthenticated, createFreezerStock);
+  app.post("/api/admin/freezer/seed", isSimpleAuthenticated, seedFreezerStock);
   app.patch("/api/admin/freezer/:id", isSimpleAuthenticated, updateFreezerStock);
 
   // Activity Logs

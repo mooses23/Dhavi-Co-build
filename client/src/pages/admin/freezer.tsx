@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Snowflake, Minus, Plus } from "lucide-react";
+import { Snowflake, Minus, Plus, PackagePlus } from "lucide-react";
 import type { FreezerStock, Product } from "@shared/schema";
 
 type FreezerStockWithProduct = FreezerStock & {
@@ -28,6 +28,23 @@ export default function AdminFreezer() {
 
   const { data: freezerStock, isLoading } = useQuery<FreezerStockWithProduct[]>({
     queryKey: ["/api/admin/freezer"],
+  });
+
+  const { data: products } = useQuery<Product[]>({
+    queryKey: ["/api/admin/products"],
+  });
+
+  const seedFreezerMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/admin/freezer/seed", {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/freezer"] });
+      toast({ title: "Freezer Stocked", description: "Added 10 bags of each product to freezer." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const updateQuantityMutation = useMutation({
@@ -108,6 +125,17 @@ export default function AdminFreezer() {
               <p className="text-sm mt-1">
                 Add stock from the Bake page after completing production batches
               </p>
+              {products && products.length > 0 && (
+                <Button
+                  className="mt-4"
+                  onClick={() => seedFreezerMutation.mutate()}
+                  disabled={seedFreezerMutation.isPending}
+                  data-testid="button-stock-freezer"
+                >
+                  <PackagePlus className="h-4 w-4 mr-2" />
+                  {seedFreezerMutation.isPending ? "Stocking..." : "Stock Freezer (10 bags each)"}
+                </Button>
+              )}
             </div>
           ) : (
             <Table>

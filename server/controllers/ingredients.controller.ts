@@ -89,3 +89,39 @@ export async function adjustIngredientInventory(req: Request, res: Response) {
     res.status(500).json({ message: "Failed to adjust ingredient inventory" });
   }
 }
+
+const basicBakeryIngredients = [
+  { name: "Spelt Flour", unit: "lb", onHand: "100", reorderThreshold: "20" },
+  { name: "Sea Salt", unit: "lb", onHand: "10", reorderThreshold: "2" },
+  { name: "Olive Oil", unit: "gallon", onHand: "5", reorderThreshold: "1" },
+  { name: "Honey", unit: "gallon", onHand: "3", reorderThreshold: "0.5" },
+  { name: "Yeast", unit: "lb", onHand: "2", reorderThreshold: "0.5" },
+  { name: "Sesame Seeds", unit: "lb", onHand: "5", reorderThreshold: "1" },
+  { name: "Poppy Seeds", unit: "lb", onHand: "3", reorderThreshold: "0.5" },
+  { name: "Everything Seasoning", unit: "lb", onHand: "4", reorderThreshold: "1" },
+  { name: "Cornmeal", unit: "lb", onHand: "10", reorderThreshold: "2" },
+  { name: "Bagel Bags", unit: "count", onHand: "500", reorderThreshold: "100" },
+];
+
+export async function seedIngredients(req: Request, res: Response) {
+  try {
+    const existingIngredients = await storage.getIngredients();
+    if (existingIngredients.length > 0) {
+      return res.status(400).json({ message: "Pantry already has ingredients. Seed only works on empty pantry." });
+    }
+
+    const createdIngredients = [];
+    for (const ingredient of basicBakeryIngredients) {
+      const created = await storage.createIngredient(ingredient);
+      createdIngredients.push(created);
+    }
+
+    res.json({ 
+      message: "Pantry stocked with basic bakery ingredients",
+      ingredients: createdIngredients 
+    });
+  } catch (error) {
+    console.error("Error seeding ingredients:", error);
+    res.status(500).json({ message: "Failed to seed ingredients" });
+  }
+}

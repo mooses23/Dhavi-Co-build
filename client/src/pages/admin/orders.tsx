@@ -1,5 +1,8 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -28,9 +32,15 @@ import {
   Receipt,
   Inbox,
   Loader2,
-  XCircle
+  XCircle,
+  Plus,
+  Trash2
 } from "lucide-react";
-import type { Order } from "@shared/schema";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import type { Order, Product, Location } from "@shared/schema";
 
 const statusConfig: Record<string, { color: string; icon: any; label: string }> = {
   new: { color: "bg-blue-500/10 text-blue-600 border-blue-500/20", icon: Clock, label: "New" },
@@ -50,6 +60,34 @@ const workflowTabConfig: Record<WorkflowTab, { label: string; icon: any; statuse
   "cancelled": { label: "Cancelled", icon: XCircle, statuses: ["cancelled"] },
 };
 
+const fulfillmentWindowOptions = [
+  { value: "Morning (8am-12pm)", label: "Morning (8am-12pm)" },
+  { value: "Afternoon (12pm-5pm)", label: "Afternoon (12pm-5pm)" },
+  { value: "Evening (5pm-8pm)", label: "Evening (5pm-8pm)" },
+];
+
+const newOrderFormSchema = z.object({
+  customerName: z.string().min(1, "Customer name is required"),
+  customerEmail: z.string().email("Valid email is required"),
+  customerPhone: z.string().optional(),
+  deliveryAddress: z.string().min(1, "Delivery address is required"),
+  deliveryCity: z.string().min(1, "City is required"),
+  deliveryState: z.string().min(1, "State is required"),
+  deliveryZip: z.string().min(1, "ZIP code is required"),
+  deliveryInstructions: z.string().optional(),
+  fulfillmentDate: z.date({ required_error: "Fulfillment date is required" }),
+  fulfillmentWindow: z.string().min(1, "Fulfillment window is required"),
+  locationId: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+type NewOrderFormData = z.infer<typeof newOrderFormSchema>;
+
+interface NewOrderItem {
+  productId: string;
+  quantity: number;
+}
+
 export default function AdminOrders() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<WorkflowTab>("incoming");
@@ -68,12 +106,141 @@ export default function AdminOrders() {
     notes: "",
   });
   const printRef = useRef<HTMLDivElement>(null);
+  
+  const [showNewOrderDialog, setShowNewOrderDialog] = useState(false);
+  const [newOrderItems, setNewOrderItems] = useState<NewOrderItem[]>([{ productId: "", quantity: 1 }]);
+  
+  const newOrderForm = useForm<NewOrderFormData>({
+    resolver: zodResolver(newOrderFormSchema),
+    defaultValues: {
+      customerName: "",
+      customerEmail: "",
+      customerPhone: "",
+      deliveryAddress: "",
+      deliveryCity: "",
+      deliveryState: "",
+      deliveryZip: "",
+      deliveryInstructions: "",
+      fulfillmentDate: new Date(),
+      fulfillmentWindow: "Morning (8am-12pm)",
+      locationId: "",
+      notes: "",
+    },
+  });
 
   const { data: ordersResponse, isLoading } = useQuery<{ orders: (Order & { location: { name: string }; items: any[] })[]; pagination: any } | (Order & { location: { name: string }; items: any[] })[]>({
     queryKey: ["/api/admin/orders"],
   });
 
   const orders = Array.isArray(ordersResponse) ? ordersResponse : (ordersResponse?.orders || []);
+
+  const { data: products } = useQuery<Product[]>({
+    queryKey: ["/api/admin/products"],
+  });
+
+  const { data: locations } = useQuery<Location[]>({
+    queryKey: ["/api/admin/locations"],
+  });
+
+  const createManualOrderMutation = useMutation({
+    mutationFn: async (data: {
+      customerName: string;
+      customerEmail: string;
+      customerPhone?: string;
+      deliveryAddress: string;
+      deliveryCity: string;
+      deliveryState: string;
+      deliveryZip: string;
+      deliveryInstructions?: string;
+      fulfillmentDate: string;
+      fulfillmentWindow: string;
+      locationId?: string;
+      notes?: string;
+      items: { productId: string; quantity: number }[];
+    }) => {
+      return await apiRequest("POST", "/api/admin/orders/manual", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+      toast({ title: "Order Created", description: "Manual order has been created successfully" });
+      setShowNewOrderDialog(false);
+      resetNewOrderForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetNewOrderForm = () => {
+    newOrderForm.reset({
+      customerName: "",
+      customerEmail: "",
+      customerPhone: "",
+      deliveryAddress: "",
+      deliveryCity: "",
+      deliveryState: "",
+      deliveryZip: "",
+      deliveryInstructions: "",
+      fulfillmentDate: new Date(),
+      fulfillmentWindow: "Morning (8am-12pm)",
+      locationId: "",
+      notes: "",
+    });
+    setNewOrderItems([{ productId: "", quantity: 1 }]);
+  };
+
+  const handleAddOrderItem = () => {
+    setNewOrderItems([...newOrderItems, { productId: "", quantity: 1 }]);
+  };
+
+  const handleRemoveOrderItem = (index: number) => {
+    if (newOrderItems.length > 1) {
+      setNewOrderItems(newOrderItems.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleOrderItemChange = (index: number, field: keyof NewOrderItem, value: string | number) => {
+    const updatedItems = [...newOrderItems];
+    updatedItems[index] = { ...updatedItems[index], [field]: value };
+    setNewOrderItems(updatedItems);
+  };
+
+  const handleCreateOrder = (data: NewOrderFormData) => {
+    const validItems = newOrderItems.filter(item => item.productId && item.quantity > 0);
+    if (validItems.length === 0) {
+      toast({ title: "Missing Items", description: "Please add at least one product", variant: "destructive" });
+      return;
+    }
+
+    createManualOrderMutation.mutate({
+      customerName: data.customerName,
+      customerEmail: data.customerEmail,
+      customerPhone: data.customerPhone || undefined,
+      deliveryAddress: data.deliveryAddress,
+      deliveryCity: data.deliveryCity,
+      deliveryState: data.deliveryState,
+      deliveryZip: data.deliveryZip,
+      deliveryInstructions: data.deliveryInstructions || undefined,
+      fulfillmentDate: data.fulfillmentDate.toISOString(),
+      fulfillmentWindow: data.fulfillmentWindow,
+      locationId: data.locationId || undefined,
+      notes: data.notes || undefined,
+      items: validItems,
+    });
+  };
+
+  const calculateOrderTotal = () => {
+    let total = 0;
+    for (const item of newOrderItems) {
+      if (item.productId && item.quantity > 0) {
+        const product = products?.find(p => p.id === item.productId);
+        if (product) {
+          total += parseFloat(product.price) * item.quantity;
+        }
+      }
+    }
+    return total;
+  };
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
@@ -351,15 +518,20 @@ export default function AdminOrders() {
           <h1 className="font-serif text-3xl font-bold">Orders</h1>
           <p className="text-muted-foreground mt-1">Manage customer orders</p>
         </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search orders..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 w-[250px]"
-            data-testid="input-search"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search orders..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 w-[250px]"
+              data-testid="input-search"
+            />
+          </div>
+          <Button size="icon" onClick={() => setShowNewOrderDialog(true)} data-testid="button-new-order">
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -770,6 +942,290 @@ export default function AdminOrders() {
               </Button>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showNewOrderDialog} onOpenChange={(open) => { if (!open) resetNewOrderForm(); setShowNewOrderDialog(open); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Create New Order</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...newOrderForm}>
+            <form onSubmit={newOrderForm.handleSubmit(handleCreateOrder)} className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="font-medium">Customer Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={newOrderForm.control}
+                    name="customerName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Customer Name *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="John Doe" data-testid="input-new-customer-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={newOrderForm.control}
+                    name="customerEmail"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Customer Email *</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="email" placeholder="john@example.com" data-testid="input-new-customer-email" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={newOrderForm.control}
+                    name="customerPhone"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Phone (optional)</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="(555) 555-5555" data-testid="input-new-customer-phone" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-medium">Delivery Address</h3>
+                <FormField
+                  control={newOrderForm.control}
+                  name="deliveryAddress"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Street Address *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="123 Main St" data-testid="input-new-delivery-address" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={newOrderForm.control}
+                    name="deliveryCity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>City *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="New York" data-testid="input-new-delivery-city" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={newOrderForm.control}
+                    name="deliveryState"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>State *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="NY" data-testid="input-new-delivery-state" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={newOrderForm.control}
+                    name="deliveryZip"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>ZIP *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="10001" data-testid="input-new-delivery-zip" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={newOrderForm.control}
+                  name="deliveryInstructions"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Delivery Instructions (optional)</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Leave at door, ring doorbell, etc." data-testid="input-new-delivery-instructions" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-medium">Fulfillment Details</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={newOrderForm.control}
+                    name="fulfillmentDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fulfillment Date *</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                                data-testid="button-fulfillment-date"
+                              >
+                                {field.value ? format(field.value, "PPP") : "Pick a date"}
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={newOrderForm.control}
+                    name="fulfillmentWindow"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fulfillment Window *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-fulfillment-window">
+                              <SelectValue placeholder="Select window" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {fulfillmentWindowOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={newOrderForm.control}
+                    name="locationId"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Location (optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-location">
+                              <SelectValue placeholder="Select location" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {locations?.map((location) => (
+                              <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium">Order Items</h3>
+                  <Button type="button" variant="outline" size="sm" onClick={handleAddOrderItem} data-testid="button-add-item">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Item
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {newOrderItems.map((item, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      <Select value={item.productId} onValueChange={(v) => handleOrderItemChange(index, "productId", v)}>
+                        <SelectTrigger className="flex-1" data-testid={`select-product-${index}`}>
+                          <SelectValue placeholder="Select product" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products?.filter(p => p.isActive).map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name} - ${parseFloat(product.price).toFixed(2)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={item.quantity}
+                        onChange={(e) => handleOrderItemChange(index, "quantity", parseInt(e.target.value) || 1)}
+                        className="w-20"
+                        data-testid={`input-quantity-${index}`}
+                      />
+                      <Button 
+                        type="button"
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => handleRemoveOrderItem(index)}
+                        disabled={newOrderItems.length === 1}
+                        data-testid={`button-remove-item-${index}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                {calculateOrderTotal() > 0 && (
+                  <div className="text-right font-semibold text-lg">
+                    Total: <span className="text-gold">${calculateOrderTotal().toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+
+              <FormField
+                control={newOrderForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem className="border-t pt-4">
+                    <FormLabel>Notes (optional)</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="Special instructions, baker notes, etc." data-testid="input-new-notes" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter className="gap-2">
+                <Button type="button" variant="outline" onClick={() => setShowNewOrderDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createManualOrderMutation.isPending} data-testid="button-create-order">
+                  {createManualOrderMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Create Order
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>

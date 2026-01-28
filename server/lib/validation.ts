@@ -43,6 +43,26 @@ export const statusSchema = z.object({
   status: z.string().min(1),
 });
 
+export const manualOrderCreateSchema = z.object({
+  customerName: z.string().min(1),
+  customerEmail: z.string().email(),
+  customerPhone: z.string().optional(),
+  deliveryAddress: z.string().min(5),
+  deliveryCity: z.string().min(2),
+  deliveryState: z.string().min(2),
+  deliveryZip: z.string().min(5),
+  deliveryInstructions: z.string().optional(),
+  fulfillmentDate: z.string(),
+  fulfillmentWindow: z.string(),
+  locationId: z.string().optional(),
+  notes: z.string().optional(),
+  items: z.array(z.object({
+    productId: z.string().min(1),
+    quantity: z.number().min(1),
+  })).min(1),
+});
+
 export type OrderCreateInput = z.infer<typeof orderCreateSchema>;
 export type OrderUpdateInput = z.infer<typeof orderUpdateSchema>;
+export type ManualOrderCreateInput = z.infer<typeof manualOrderCreateSchema>;
 export type BatchCreateInput = z.infer<typeof batchCreateSchema>;

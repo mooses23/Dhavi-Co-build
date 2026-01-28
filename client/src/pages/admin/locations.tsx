@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,21 +15,51 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MapPin, Plus, Pencil, Store, Truck, Building, Home } from "lucide-react";
+import { useTheme } from "@/lib/theme-provider";
 import type { Location } from "@shared/schema";
 
 import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
+const createGoldMarkerIcon = () => {
+  return L.divIcon({
+    className: 'gold-marker',
+    html: `
+      <div style="
+        width: 28px;
+        height: 28px;
+        position: relative;
+      ">
+        <div style="
+          width: 28px;
+          height: 28px;
+          background: linear-gradient(135deg, #d4a017 0%, #f0c040 50%, #c69214 100%);
+          border-radius: 50% 50% 50% 0;
+          transform: rotate(-45deg);
+          box-shadow: 0 0 12px rgba(212, 160, 23, 0.6), 0 3px 8px rgba(0,0,0,0.4);
+          border: 2px solid rgba(255,255,255,0.4);
+        "></div>
+        <div style="
+          width: 10px;
+          height: 10px;
+          background: rgba(255,255,255,0.95);
+          border-radius: 50%;
+          position: absolute;
+          top: 7px;
+          left: 9px;
+        "></div>
+      </div>
+    `,
+    iconSize: [28, 28],
+    iconAnchor: [14, 28],
+    popupAnchor: [0, -28],
+  });
+};
 
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
+const DARK_TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const LIGHT_TILE_URL = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
 const NYC_CENTER: [number, number] = [40.7128, -74.0060];
 const DEFAULT_ZOOM = 11;
@@ -66,9 +96,22 @@ function MapController({ center, zoom }: { center: [number, number] | null; zoom
 
 export default function AdminLocations() {
   const { toast } = useToast();
+  const { theme } = useTheme();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+
+  const isDarkMode = useMemo(() => {
+    if (theme === "system") {
+      if (typeof window !== "undefined") {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches;
+      }
+      return false;
+    }
+    return theme === "dark";
+  }, [theme]);
+
+  const goldMarkerIcon = useMemo(() => createGoldMarkerIcon(), []);
 
   const { data: locations, isLoading } = useQuery<Location[]>({
     queryKey: ["/api/admin/locations"],
@@ -167,36 +210,39 @@ export default function AdminLocations() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px] rounded-lg overflow-hidden border border-border">
+          <div className="modern-map-container h-[350px] rounded-lg overflow-hidden relative">
             <MapContainer
               center={NYC_CENTER}
               zoom={DEFAULT_ZOOM}
               style={{ height: "100%", width: "100%" }}
+              className="modern-leaflet-map"
               data-testid="locations-map"
             >
               <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution={TILE_ATTRIBUTION}
+                url={isDarkMode ? DARK_TILE_URL : LIGHT_TILE_URL}
               />
               <MapController center={mapCenter} zoom={14} />
               {locationsWithCoords.map((location) => (
                 <Marker
                   key={location.id}
                   position={[location.latitude!, location.longitude!]}
+                  icon={goldMarkerIcon}
                   data-testid={`marker-${location.id}`}
                 >
-                  <Popup>
-                    <div className="text-sm">
-                      <p className="font-semibold">{location.name}</p>
-                      <p className="text-muted-foreground capitalize">{location.type}</p>
+                  <Popup className="modern-popup">
+                    <div className="text-sm min-w-[140px]">
+                      <p className="font-semibold text-foreground">{location.name}</p>
+                      <p className="text-muted-foreground capitalize text-xs mt-1">{location.type}</p>
                       {location.address && (
-                        <p className="text-muted-foreground mt-1">{location.address}</p>
+                        <p className="text-muted-foreground text-xs mt-1">{location.address}</p>
                       )}
                     </div>
                   </Popup>
                 </Marker>
               ))}
             </MapContainer>
+            <div className="absolute inset-0 pointer-events-none rounded-lg ring-1 ring-inset ring-border/50" />
           </div>
           {locationsWithCoords.length === 0 && locations && locations.length > 0 && (
             <p className="text-sm text-muted-foreground mt-2 text-center">

@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { storage } from "../storage.js";
 import { getStripe } from "../lib/stripe.js";
-import { orderCreateSchema, orderUpdateSchema, statusSchema } from "../lib/validation.js";
+import { orderCreateSchema, orderUpdateSchema, statusSchema, manualOrderCreateSchema } from "../lib/validation.js";
 
 export async function createOrder(req: Request, res: Response) {
   try {
@@ -258,5 +258,96 @@ export async function updateOrder(req: Request, res: Response) {
   } catch (error) {
     console.error("Error updating order:", error);
     res.status(500).json({ message: "Failed to update order" });
+  }
+}
+
+export async function createManualOrder(req: Request, res: Response) {
+  try {
+    const parseResult = manualOrderCreateSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        message: "Invalid order data", 
+        errors: parseResult.error.errors 
+      });
+    }
+
+    const {
+      customerName,
+      customerEmail,
+      customerPhone,
+      deliveryAddress,
+      deliveryCity,
+      deliveryState,
+      deliveryZip,
+      deliveryInstructions,
+      fulfillmentDate,
+      fulfillmentWindow,
+      locationId,
+      notes,
+      items,
+    } = parseResult.data;
+
+    let subtotal = 0;
+    const orderItemsData = [];
+
+    for (const item of items) {
+      const product = await storage.getProduct(item.productId);
+      if (!product || !product.isActive) {
+        return res.status(400).json({ message: `Product not available: ${item.productId}` });
+      }
+      const unitPrice = parseFloat(product.price);
+      const total = unitPrice * item.quantity;
+      subtotal += total;
+      orderItemsData.push({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: unitPrice.toFixed(2),
+        total: total.toFixed(2),
+      });
+    }
+
+    const order = await storage.createOrder({
+      customerName,
+      customerEmail,
+      customerPhone,
+      deliveryAddress,
+      deliveryCity,
+      deliveryState,
+      deliveryZip,
+      deliveryInstructions,
+      fulfillmentDate: new Date(fulfillmentDate),
+      fulfillmentWindow,
+      locationId: locationId || null,
+      notes,
+      subtotal: subtotal.toFixed(2),
+      total: subtotal.toFixed(2),
+      stripePaymentIntentId: null,
+      stripePaymentStatus: "manual",
+      status: "approved",
+    });
+
+    for (const itemData of orderItemsData) {
+      await storage.createOrderItem({
+        orderId: order.id,
+        ...itemData,
+      });
+    }
+
+    await storage.logActivity(
+      "order.created_manual",
+      "order",
+      order.id,
+      { customerName, total: subtotal.toFixed(2) },
+      undefined,
+      "admin"
+    );
+
+    res.json({
+      orderId: order.id,
+      message: "Manual order created successfully",
+    });
+  } catch (error) {
+    console.error("Error creating manual order:", error);
+    res.status(500).json({ message: "Failed to create manual order" });
   }
 }

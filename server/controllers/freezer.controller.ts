@@ -95,6 +95,51 @@ export async function updateFreezerStock(req: Request, res: Response) {
   }
 }
 
+export async function seedFreezerStock(req: Request, res: Response) {
+  try {
+    const existingStock = await storage.getFreezerStock();
+    if (existingStock.length > 0) {
+      return res.status(400).json({ message: "Freezer already has stock. Seed only works when freezer is empty." });
+    }
+
+    const products = await storage.getProducts();
+    const bagelProducts = products.filter(p => 
+      p.isActive && p.name.toLowerCase().includes("bagel")
+    );
+    
+    if (bagelProducts.length === 0) {
+      return res.status(400).json({ message: "No active bagel products found to seed." });
+    }
+
+    const createdStock = [];
+    for (const product of bagelProducts) {
+      const stock = await storage.createFreezerStock({
+        productId: product.id,
+        quantity: 10,
+        notes: "Initial seed stock",
+      });
+      createdStock.push(stock);
+    }
+
+    await storage.logActivity(
+      "freezer.seeded",
+      "freezer_stock",
+      undefined,
+      { productsSeeded: bagelProducts.length, quantityPerProduct: 10 },
+      undefined,
+      "admin"
+    );
+
+    res.json({ 
+      message: `Seeded freezer with ${bagelProducts.length} bagel products (10 bags each)`,
+      stock: createdStock 
+    });
+  } catch (error) {
+    console.error("Error seeding freezer stock:", error);
+    res.status(500).json({ message: "Failed to seed freezer stock" });
+  }
+}
+
 export async function getFreezerStats(req: Request, res: Response) {
   try {
     const stock = await storage.getFreezerStock();
