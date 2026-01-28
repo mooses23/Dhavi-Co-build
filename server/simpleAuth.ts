@@ -1,7 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { pool } from "./db";
+import { pool } from "./db.js";
 
 const VALID_USERNAME = "Dhavi.co";
 const VALID_PASSWORD = "SpeltBagels";
