@@ -44,9 +44,11 @@ export default function AdminProduction() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [batchItems, setBatchItems] = useState<Record<string, number>>({});
 
-  const { data: batches, isLoading } = useQuery<(Batch & { items: any[] })[]>({
+  const { data: batchesResponse, isLoading } = useQuery<{ batches: (Batch & { items: any[] })[]; pagination: any } | (Batch & { items: any[] })[]>({
     queryKey: ["/api/admin/batches"],
   });
+
+  const batches = Array.isArray(batchesResponse) ? batchesResponse : (batchesResponse?.batches || []);
 
   const { data: products } = useQuery<Product[]>({
     queryKey: ["/api/admin/products"],

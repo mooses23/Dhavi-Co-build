@@ -121,8 +121,31 @@ export async function getPublicOrder(req: Request, res: Response) {
 
 export async function getAllOrders(req: Request, res: Response) {
   try {
-    const orders = await storage.getOrders();
-    res.json(orders);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const status = req.query.status as string | undefined;
+
+    const allOrders = await storage.getOrders();
+    
+    let filteredOrders = allOrders;
+    if (status && status !== "all") {
+      filteredOrders = allOrders.filter(o => o.status === status);
+    }
+
+    const total = filteredOrders.length;
+    const totalPages = Math.ceil(total / limit);
+    const offset = (page - 1) * limit;
+    const orders = filteredOrders.slice(offset, offset + limit);
+
+    res.json({
+      orders,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    });
   } catch (error) {
     console.error("Error fetching orders:", error);
     res.status(500).json({ message: "Failed to fetch orders" });

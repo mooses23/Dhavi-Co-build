@@ -25,6 +25,7 @@ import AdminProducts from "@/pages/admin/products";
 import AdminIngredients from "@/pages/admin/ingredients";
 import AdminLocations from "@/pages/admin/locations";
 import AdminMarketing from "@/pages/admin/marketing";
+import AdminAnalytics from "@/pages/admin/analytics";
 
 function PublicRoutes() {
   return (
@@ -91,6 +92,7 @@ function BakehouseRoutes() {
         <Route path="/bakehouse/ingredients" component={AdminIngredients} />
         <Route path="/bakehouse/locations" component={AdminLocations} />
         <Route path="/bakehouse/marketing" component={AdminMarketing} />
+        <Route path="/bakehouse/analytics" component={AdminAnalytics} />
         <Route component={NotFound} />
       </Switch>
     </AdminLayout>

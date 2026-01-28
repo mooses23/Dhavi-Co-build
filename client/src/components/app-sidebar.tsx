@@ -21,6 +21,7 @@ import {
   Image,
   FileText,
   LogOut,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,11 @@ const menuItems = [
     title: "Marketing",
     url: "/bakehouse/marketing",
     icon: Image,
+  },
+  {
+    title: "Analytics",
+    url: "/bakehouse/analytics",
+    icon: BarChart3,
   },
 ];
 

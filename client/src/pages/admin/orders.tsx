@@ -57,9 +57,11 @@ export default function AdminOrders() {
   });
   const printRef = useRef<HTMLDivElement>(null);
 
-  const { data: orders, isLoading } = useQuery<(Order & { location: { name: string }; items: any[] })[]>({
+  const { data: ordersResponse, isLoading } = useQuery<{ orders: (Order & { location: { name: string }; items: any[] })[]; pagination: any } | (Order & { location: { name: string }; items: any[] })[]>({
     queryKey: ["/api/admin/orders"],
   });
+
+  const orders = Array.isArray(ordersResponse) ? ordersResponse : (ordersResponse?.orders || []);
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {

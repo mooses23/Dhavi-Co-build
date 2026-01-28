@@ -4,8 +4,31 @@ import { batchCreateSchema, statusSchema } from "../lib/validation.js";
 
 export async function getAllBatches(req: Request, res: Response) {
   try {
-    const batches = await storage.getBatches();
-    res.json(batches);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const status = req.query.status as string | undefined;
+
+    const allBatches = await storage.getBatches();
+    
+    let filteredBatches = allBatches;
+    if (status && status !== "all") {
+      filteredBatches = allBatches.filter(b => b.status === status);
+    }
+
+    const total = filteredBatches.length;
+    const totalPages = Math.ceil(total / limit);
+    const offset = (page - 1) * limit;
+    const batches = filteredBatches.slice(offset, offset + limit);
+
+    res.json({
+      batches,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    });
   } catch (error) {
     console.error("Error fetching batches:", error);
     res.status(500).json({ message: "Failed to fetch batches" });

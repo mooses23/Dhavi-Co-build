@@ -10,22 +10,28 @@ import {
   BakeSchedule,
   PendingOrdersPanel,
   LowStockAlerts,
+  FreezerStockPanel,
+  ActivityLogPanel,
 } from "./components";
 
 export default function AdminDashboard() {
   const { toast } = useToast();
 
-  const { data: orders, isLoading: ordersLoading } = useQuery<Order[]>({
+  const { data: ordersResponse, isLoading: ordersLoading } = useQuery<{ orders: Order[]; pagination: any } | Order[]>({
     queryKey: ["/api/admin/orders"],
   });
+
+  const orders = Array.isArray(ordersResponse) ? ordersResponse : (ordersResponse?.orders || []);
 
   const { data: ingredients, isLoading: ingredientsLoading } = useQuery<Ingredient[]>({
     queryKey: ["/api/admin/ingredients"],
   });
 
-  const { data: batches, isLoading: batchesLoading } = useQuery<(Batch & { items: any[] })[]>({
+  const { data: batchesResponse, isLoading: batchesLoading } = useQuery<{ batches: (Batch & { items: any[] })[]; pagination: any } | (Batch & { items: any[] })[]>({
     queryKey: ["/api/admin/batches"],
   });
+
+  const batches = Array.isArray(batchesResponse) ? batchesResponse : (batchesResponse?.batches || []);
 
   const { data: products } = useQuery<Product[]>({
     queryKey: ["/api/admin/products"],
@@ -134,6 +140,11 @@ export default function AdminDashboard() {
           lowStockIngredients={lowStockIngredients}
           isLoading={ingredientsLoading}
         />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <FreezerStockPanel />
+        <ActivityLogPanel />
       </div>
     </div>
   );
