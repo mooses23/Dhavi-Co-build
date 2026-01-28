@@ -20,11 +20,11 @@ export default function LandingPage() {
                   Order Now
                 </Button>
               </Link>
-              <a href="/api/login">
-                <Button variant="ghost" data-testid="link-admin-login">
-                  Admin
+              <Link href="/bakers-login">
+                <Button variant="ghost" data-testid="link-bakers-login">
+                  Baker's Login
                 </Button>
-              </a>
+              </Link>
             </div>
           </div>
         </div>
