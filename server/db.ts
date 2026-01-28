@@ -19,8 +19,11 @@ export const pool = new Pool({
   connectionTimeoutMillis: 10000,
   // Short idle timeout for serverless - prevents stale connections with PgBouncer
   idleTimeoutMillis: 5000,
-  // Ensure SSL is configured for Supabase
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+  // SSL configuration for Supabase - required for all Supabase connections
+  // Use secure default settings (rejectUnauthorized: true is implicit)
+  ssl: process.env.DATABASE_URL?.includes('supabase') || process.env.NODE_ENV === 'production' 
+    ? true 
+    : undefined,
 });
 
 // Handle pool errors

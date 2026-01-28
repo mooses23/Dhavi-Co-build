@@ -55,8 +55,8 @@ export async function setupSimpleAuth(app: Express) {
     tableName: "session",
     // Disable auto table creation since we create it manually above
     createTableIfMissing: false,
-    // Enable session pruning to clean up expired sessions
-    pruneSessionInterval: 60, // Prune every 60 seconds
+    // Enable session pruning to clean up expired sessions (every 15 minutes)
+    pruneSessionInterval: 900,
     errorLog: (error) => {
       console.error("Session store error:", error);
     },
