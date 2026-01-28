@@ -9,6 +9,7 @@ Login failed with 500 error when deployed to Vercel with Supabase database.
 2. **Database Pool Configuration**: Not optimized for Vercel's serverless environment
 3. **Insufficient Error Logging**: No detailed logs to diagnose the actual failure
 4. **Error Message Exposure**: Internal error details were exposed to clients
+5. **Supabase Pooler Mode**: Transaction mode pooler (port 6543) causes issues with session stores; Session mode (port 5432) is required
 
 ## Solutions Implemented
 
@@ -19,6 +20,7 @@ Login failed with 500 error when deployed to Vercel with Supabase database.
 Changed `setupSimpleAuth` from synchronous to async, ensuring:
 - Database connection is tested first
 - Session table is created before session store initialization
+- Index created on `expire` column for better performance
 - Fails fast if database setup fails
 - All steps are logged for debugging
 
@@ -27,6 +29,7 @@ export async function setupSimpleAuth(app: Express) {
   // Ensure database and session table are ready BEFORE creating session store
   await pool.query("SELECT 1");
   await pool.query(`CREATE TABLE IF NOT EXISTS "session" (...)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire")`);
   
   const sessionStore = new PgSession({ ... });
   // Session store only created after table exists
@@ -40,10 +43,20 @@ export async function setupSimpleAuth(app: Express) {
 Configured PostgreSQL connection pool for Vercel serverless functions:
 - Max 1 connection (serverless best practice)
 - Connection timeout: 10 seconds
-- Idle timeout: 30 seconds
+- **Idle timeout: 5 seconds** (reduced from 30s to prevent stale connections with PgBouncer)
+- SSL configuration for Supabase production connections
 - Error event handler for unexpected errors
 
-### 3. Enhanced Error Logging & Security
+### 3. Fixed Cookie Name Mismatch
+
+**File: `server/simpleAuth.ts`**
+
+Fixed logout to clear the correct cookie:
+- Session uses cookie name `dhavi.sid`
+- Logout was clearing `connect.sid` (wrong)
+- Now properly clears `dhavi.sid` with matching options
+
+### 4. Enhanced Error Logging & Security
 
 **Files: `server/simpleAuth.ts`, `server/routes.ts`**
 
@@ -52,7 +65,7 @@ Configured PostgreSQL connection pool for Vercel serverless functions:
 - Environment-aware error handling (detailed in dev, generic in prod)
 - No exposure of database connection details or system internals
 
-### 4. Added Health Check Endpoint
+### 5. Added Health Check Endpoint
 
 **File: `server/routes.ts`**
 
@@ -99,7 +112,10 @@ STRIPE_PUBLISHABLE_KEY=pk_...
 VITE_STRIPE_PUBLISHABLE_KEY=pk_...
 ```
 
-**Important**: For Supabase, use the "Connection pooling" URL (not direct connection URL) from your project settings.
+**CRITICAL**: For Supabase with this app, you MUST use:
+- **Session Mode** pooler (port 5432), NOT Transaction Mode (port 6543)
+- Transaction mode causes "prepared statement already exists" errors with `connect-pg-simple`
+- URL format: `postgresql://postgres.[project-ref]:[password]@[region]-pooler.supabase.com:5432/postgres?sslmode=require`
 
 ### 2. Deploy to Vercel
 

@@ -18,7 +18,12 @@ Set the following environment variables in your Vercel project settings:
 ```
 DATABASE_URL=postgresql://[user]:[password]@[host]:[port]/[database]?sslmode=require
 ```
-Get this from your Supabase project settings under "Database" → "Connection String" → "URI" (make sure to select "Use connection pooling" for better serverless performance).
+
+**IMPORTANT for Supabase:** In your Supabase project settings under "Database" → "Connection Pooling":
+- Use the **Session Mode** pooler URL (port 5432) instead of Transaction Mode (port 6543)
+- Session mode is required for apps that use server-side sessions (like this app with `connect-pg-simple`)
+- Transaction mode can cause "prepared statement already exists" errors with session stores
+- The URL format is: `postgresql://postgres.[project-ref]:[password]@[region]-pooler.supabase.com:5432/postgres`
 
 #### Session Security
 ```
@@ -78,12 +83,15 @@ npm run db:push
 
 Check the following:
 
-1. **Database Connection**: Verify `DATABASE_URL` is correct
-   - Test connection using `/api/health` endpoint
-   - Ensure you're using the connection pooling URL from Supabase
-   - Verify SSL mode is enabled if required
+1. **Connection Pooler Mode**: For session-based apps, use **Session Mode** (port 5432), NOT Transaction Mode (port 6543)
+   - Transaction mode pooler can cause session storage errors
+   - In Supabase, go to "Database" → "Connection Pooling" and use the Session mode connection string
 
-2. **Session Table**: The session table should be created automatically, but you can create it manually if needed:
+2. **Database Connection**: Verify `DATABASE_URL` is correct
+   - Test connection using `/api/health` endpoint
+   - Verify SSL mode is enabled (`?sslmode=require` in URL)
+   
+3. **Session Table**: The session table should be created automatically, but you can create it manually if needed:
    ```sql
    CREATE TABLE IF NOT EXISTS "session" (
      "sid" varchar NOT NULL COLLATE "default",
@@ -91,14 +99,15 @@ Check the following:
      "expire" timestamp(6) NOT NULL,
      CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
    );
+   CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
    ```
 
-3. **Check Logs**: View Vercel function logs to see detailed error messages
+4. **Check Logs**: View Vercel function logs to see detailed error messages
    - Go to Vercel Dashboard → Your Project → Deployments
    - Click on the deployment → Functions tab
    - View the `/api` function logs
 
-4. **Environment Variables**: Ensure all required variables are set in Vercel
+5. **Environment Variables**: Ensure all required variables are set in Vercel
    - Go to Project Settings → Environment Variables
    - Verify `DATABASE_URL` and `SESSION_SECRET` are present
 
