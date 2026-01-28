@@ -46,7 +46,7 @@ const adjustmentTypeConfig: Record<string, { color: string; icon: any; label: st
   production: { color: "bg-orange-500/10 text-orange-600 border-orange-500/20", icon: Factory, label: "Production" },
 };
 
-export default function AdminIngredients() {
+export default function AdminPantry() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = useState(false);
@@ -176,7 +176,7 @@ export default function AdminIngredients() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="font-serif text-3xl font-bold">Ingredients</h1>
+          <h1 className="font-serif text-3xl font-bold">Pantry</h1>
           <p className="text-muted-foreground mt-1">Track your inventory</p>
         </div>
         <div className="flex gap-2">
