@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,10 +17,29 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MapPin, Plus, Pencil, Store, Truck, Building, Home } from "lucide-react";
 import type { Location } from "@shared/schema";
 
+import "leaflet/dist/leaflet.css";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
+
+const NYC_CENTER: [number, number] = [40.7128, -74.0060];
+const DEFAULT_ZOOM = 11;
+
 const locationFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.string().min(1, "Type is required"),
   address: z.string().optional(),
+  latitude: z.union([z.number(), z.string().transform(v => v === "" ? null : parseFloat(v))]).nullable().optional(),
+  longitude: z.union([z.number(), z.string().transform(v => v === "" ? null : parseFloat(v))]).nullable().optional(),
   isActive: z.boolean().default(true),
 });
 
@@ -33,10 +52,23 @@ const locationTypes = [
   { value: "delivery", label: "Delivery", icon: Truck },
 ];
 
+function MapController({ center, zoom }: { center: [number, number] | null; zoom: number }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (center) {
+      map.flyTo(center, zoom, { duration: 0.5 });
+    }
+  }, [center, zoom, map]);
+  
+  return null;
+}
+
 export default function AdminLocations() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
 
   const { data: locations, isLoading } = useQuery<Location[]>({
     queryKey: ["/api/admin/locations"],
@@ -48,16 +80,23 @@ export default function AdminLocations() {
       name: "",
       type: "",
       address: "",
+      latitude: null,
+      longitude: null,
       isActive: true,
     },
   });
 
   const createLocationMutation = useMutation({
     mutationFn: async (data: LocationFormData) => {
+      const payload = {
+        ...data,
+        latitude: data.latitude ?? null,
+        longitude: data.longitude ?? null,
+      };
       if (editingLocation) {
-        return await apiRequest("PATCH", `/api/admin/locations/${editingLocation.id}`, data);
+        return await apiRequest("PATCH", `/api/admin/locations/${editingLocation.id}`, payload);
       }
-      return await apiRequest("POST", "/api/admin/locations", data);
+      return await apiRequest("POST", "/api/admin/locations", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/locations"] });
@@ -81,6 +120,8 @@ export default function AdminLocations() {
       name: location.name,
       type: location.type,
       address: location.address || "",
+      latitude: location.latitude ?? null,
+      longitude: location.longitude ?? null,
       isActive: location.isActive,
     });
     setIsDialogOpen(true);
@@ -95,6 +136,16 @@ export default function AdminLocations() {
     return config?.icon || MapPin;
   };
 
+  const handleLocationCardClick = (location: Location) => {
+    if (location.latitude && location.longitude) {
+      setMapCenter([location.latitude, location.longitude]);
+    }
+  };
+
+  const locationsWithCoords = locations?.filter(
+    (loc) => loc.latitude != null && loc.longitude != null
+  ) || [];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -107,6 +158,53 @@ export default function AdminLocations() {
           Add Location
         </Button>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Location Map
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] rounded-lg overflow-hidden border border-border">
+            <MapContainer
+              center={NYC_CENTER}
+              zoom={DEFAULT_ZOOM}
+              style={{ height: "100%", width: "100%" }}
+              data-testid="locations-map"
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <MapController center={mapCenter} zoom={14} />
+              {locationsWithCoords.map((location) => (
+                <Marker
+                  key={location.id}
+                  position={[location.latitude!, location.longitude!]}
+                  data-testid={`marker-${location.id}`}
+                >
+                  <Popup>
+                    <div className="text-sm">
+                      <p className="font-semibold">{location.name}</p>
+                      <p className="text-muted-foreground capitalize">{location.type}</p>
+                      {location.address && (
+                        <p className="text-muted-foreground mt-1">{location.address}</p>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </MapContainer>
+          </div>
+          {locationsWithCoords.length === 0 && locations && locations.length > 0 && (
+            <p className="text-sm text-muted-foreground mt-2 text-center">
+              Add coordinates to your locations to see them on the map
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -134,8 +232,14 @@ export default function AdminLocations() {
             <div className="grid sm:grid-cols-2 gap-4">
               {locations.map((location) => {
                 const TypeIcon = getTypeIcon(location.type);
+                const hasCoords = location.latitude != null && location.longitude != null;
                 return (
-                  <Card key={location.id} data-testid={`location-card-${location.id}`}>
+                  <Card 
+                    key={location.id} 
+                    data-testid={`location-card-${location.id}`}
+                    className={hasCoords ? "cursor-pointer hover-elevate" : ""}
+                    onClick={() => hasCoords && handleLocationCardClick(location)}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex items-start gap-3">
@@ -152,6 +256,11 @@ export default function AdminLocations() {
                                 {location.address}
                               </p>
                             )}
+                            {hasCoords && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {location.latitude?.toFixed(4)}, {location.longitude?.toFixed(4)}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -163,7 +272,10 @@ export default function AdminLocations() {
                           <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => openEditDialog(location)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditDialog(location);
+                            }}
                             data-testid={`button-edit-${location.id}`}
                           >
                             <Pencil className="h-4 w-4" />
@@ -234,18 +346,62 @@ export default function AdminLocations() {
                   <FormItem>
                     <FormLabel>Address (optional)</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="123 Main St" />
+                      <Input {...field} placeholder="123 Main St" data-testid="input-address" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="latitude"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Latitude</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="any"
+                          placeholder="40.7128"
+                          value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
+                          data-testid="input-latitude"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="longitude"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Longitude</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="any"
+                          placeholder="-74.0060"
+                          value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
+                          data-testid="input-longitude"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
                 name="isActive"
                 render={({ field }) => (
-                  <FormItem className="flex items-center justify-between rounded-lg border border-border p-3">
+                  <FormItem className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
                     <div>
                       <FormLabel className="mb-0">Active</FormLabel>
                       <p className="text-sm text-muted-foreground">Available for orders</p>

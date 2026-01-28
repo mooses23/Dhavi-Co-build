@@ -71,6 +71,26 @@ export async function registerRoutes(
   app.post("/api/orders", createOrder);
   app.get("/api/orders/:id", getPublicOrder);
 
+  // Public freezer availability - returns product quantities for ordering
+  app.get("/api/freezer/availability", async (req, res) => {
+    try {
+      const freezerStock = await storage.getFreezerStock();
+      
+      const availability: Record<string, number> = {};
+      for (const item of freezerStock) {
+        if (!availability[item.productId]) {
+          availability[item.productId] = 0;
+        }
+        availability[item.productId] += item.quantity;
+      }
+      
+      res.json(availability);
+    } catch (error) {
+      console.error("Error fetching freezer availability:", error);
+      res.status(500).json({ message: "Failed to fetch availability" });
+    }
+  });
+
   // ==========================================
   // ADMIN ROUTES (Protected)
   // ==========================================

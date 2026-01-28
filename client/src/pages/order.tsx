@@ -44,6 +44,14 @@ export default function OrderPage() {
     queryKey: ["/api/products"],
   });
 
+  const { data: availability, isLoading: availabilityLoading } = useQuery<Record<string, number>>({
+    queryKey: ["/api/freezer/availability"],
+  });
+
+  const getAvailableStock = (productId: string): number => {
+    return availability?.[productId] ?? 0;
+  };
+
   const form = useForm<OrderFormData>({
     resolver: zodResolver(orderFormSchema),
     defaultValues: {
@@ -85,9 +93,10 @@ export default function OrderPage() {
   });
 
   const updateQuantity = (productId: string, delta: number) => {
+    const maxAvailable = getAvailableStock(productId);
     setCart((prev) => {
       const current = prev[productId] || 0;
-      const next = Math.max(0, current + delta);
+      const next = Math.max(0, Math.min(current + delta, maxAvailable));
       if (next === 0) {
         const { [productId]: _, ...rest } = prev;
         return rest;
@@ -160,7 +169,7 @@ export default function OrderPage() {
           <div className="lg:col-span-2 space-y-8">
             <section>
               <h2 className="font-serif text-xl font-semibold mb-4">Select Bagels</h2>
-              {productsLoading ? (
+              {productsLoading || availabilityLoading ? (
                 <div className="grid sm:grid-cols-2 gap-4">
                   {[1, 2, 3, 4].map((i) => (
                     <Skeleton key={i} className="h-40 rounded-xl" />
@@ -168,43 +177,64 @@ export default function OrderPage() {
                 </div>
               ) : (
                 <div className="grid sm:grid-cols-2 gap-4">
-                  {activeProducts.map((product) => (
-                    <Card key={product.id} className="overflow-hidden" data-testid={`card-product-${product.id}`}>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h3 className="font-semibold">{product.name}</h3>
-                            <p className="text-sm text-muted-foreground">{product.description}</p>
+                  {activeProducts.map((product) => {
+                    const stock = getAvailableStock(product.id);
+                    const isOutOfStock = stock === 0;
+                    const currentQty = cart[product.id] || 0;
+                    const canAddMore = currentQty < stock;
+
+                    return (
+                      <Card 
+                        key={product.id} 
+                        className={`overflow-hidden ${isOutOfStock ? 'opacity-60' : ''}`} 
+                        data-testid={`card-product-${product.id}`}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <h3 className="font-semibold">{product.name}</h3>
+                              <p className="text-sm text-muted-foreground">{product.description}</p>
+                              {isOutOfStock ? (
+                                <span className="text-sm font-medium text-destructive" data-testid={`text-stock-${product.id}`}>
+                                  Out of Stock
+                                </span>
+                              ) : (
+                                <span className="text-sm text-muted-foreground" data-testid={`text-stock-${product.id}`}>
+                                  {stock} available
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-serif text-lg text-gold font-semibold">
+                              ${parseFloat(product.price).toFixed(2)}
+                            </span>
                           </div>
-                          <span className="font-serif text-lg text-gold font-semibold">
-                            ${parseFloat(product.price).toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-end gap-3">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => updateQuantity(product.id, -1)}
-                            disabled={!cart[product.id]}
-                            data-testid={`button-minus-${product.id}`}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <span className="w-8 text-center font-medium" data-testid={`text-qty-${product.id}`}>
-                            {cart[product.id] || 0}
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => updateQuantity(product.id, 1)}
-                            data-testid={`button-plus-${product.id}`}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                          <div className="flex items-center justify-end gap-3">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => updateQuantity(product.id, -1)}
+                              disabled={!cart[product.id] || isOutOfStock}
+                              data-testid={`button-minus-${product.id}`}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-8 text-center font-medium" data-testid={`text-qty-${product.id}`}>
+                              {cart[product.id] || 0}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => updateQuantity(product.id, 1)}
+                              disabled={isOutOfStock || !canAddMore}
+                              data-testid={`button-plus-${product.id}`}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
               {!productsLoading && activeProducts.length === 0 && (

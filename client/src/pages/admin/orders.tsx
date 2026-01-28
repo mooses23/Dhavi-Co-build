@@ -7,7 +7,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -25,7 +24,11 @@ import {
   Pencil,
   Printer,
   Search,
-  FileText
+  FileText,
+  Receipt,
+  Inbox,
+  Loader2,
+  XCircle
 } from "lucide-react";
 import type { Order } from "@shared/schema";
 
@@ -38,9 +41,18 @@ const statusConfig: Record<string, { color: string; icon: any; label: string }> 
   cancelled: { color: "bg-destructive/10 text-destructive border-destructive/20", icon: X, label: "Cancelled" },
 };
 
+type WorkflowTab = "incoming" | "in-progress" | "completed" | "cancelled";
+
+const workflowTabConfig: Record<WorkflowTab, { label: string; icon: any; statuses: string[] }> = {
+  "incoming": { label: "Incoming", icon: Inbox, statuses: ["new"] },
+  "in-progress": { label: "In Progress", icon: Loader2, statuses: ["approved", "baking", "ready"] },
+  "completed": { label: "Completed", icon: CheckCircle, statuses: ["completed"] },
+  "cancelled": { label: "Cancelled", icon: XCircle, statuses: ["cancelled"] },
+};
+
 export default function AdminOrders() {
   const { toast } = useToast();
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<WorkflowTab>("incoming");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [editMode, setEditMode] = useState(false);
@@ -181,13 +193,155 @@ export default function AdminOrders() {
     }
   };
 
+  const handleGenerateInvoice = () => {
+    if (!selectedOrder) return;
+    const invoiceDate = format(new Date(), "MMMM d, yyyy");
+    const orderDate = format(new Date(selectedOrder.createdAt || new Date()), "MMMM d, yyyy");
+    const invoiceNumber = `INV-${selectedOrder.id.slice(0, 8).toUpperCase()}`;
+    
+    const invoiceContent = `
+      <html>
+        <head>
+          <title>Invoice ${invoiceNumber} - D'Havi Spelt Bagels</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #333; }
+            .invoice-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 3px solid #d4a017; }
+            .brand { font-size: 28px; font-weight: bold; color: #1a1a1a; }
+            .brand-tagline { color: #666; font-size: 14px; margin-top: 4px; }
+            .invoice-title { text-align: right; }
+            .invoice-title h1 { font-size: 32px; color: #d4a017; margin-bottom: 8px; }
+            .invoice-number { color: #666; font-size: 14px; }
+            .invoice-details { display: flex; justify-content: space-between; margin-bottom: 40px; }
+            .detail-section { flex: 1; }
+            .detail-section h3 { font-size: 12px; text-transform: uppercase; color: #888; margin-bottom: 8px; letter-spacing: 1px; }
+            .detail-section p { margin-bottom: 4px; line-height: 1.5; }
+            .detail-section .name { font-weight: 600; font-size: 16px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+            thead { background: #f8f8f8; }
+            th { text-align: left; padding: 12px; font-size: 12px; text-transform: uppercase; color: #666; letter-spacing: 0.5px; border-bottom: 2px solid #e0e0e0; }
+            th:last-child { text-align: right; }
+            td { padding: 16px 12px; border-bottom: 1px solid #eee; }
+            td:last-child { text-align: right; font-weight: 500; }
+            .item-name { font-weight: 500; }
+            .item-desc { color: #666; font-size: 13px; margin-top: 2px; }
+            .totals { margin-left: auto; width: 300px; }
+            .total-row { display: flex; justify-content: space-between; padding: 8px 0; }
+            .total-row.subtotal { border-bottom: 1px solid #eee; }
+            .total-row.grand-total { font-size: 20px; font-weight: 700; color: #d4a017; border-top: 2px solid #333; padding-top: 16px; margin-top: 8px; }
+            .footer { margin-top: 60px; text-align: center; padding-top: 20px; border-top: 1px solid #eee; color: #888; font-size: 13px; }
+            .footer p { margin-bottom: 4px; }
+            .payment-note { background: #f8f9fa; padding: 16px; border-radius: 8px; margin-top: 30px; }
+            .payment-note h4 { font-size: 14px; margin-bottom: 8px; }
+            .payment-note p { color: #666; font-size: 13px; }
+            @media print {
+              body { padding: 20px; }
+              .invoice-header { page-break-inside: avoid; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="invoice-header">
+            <div>
+              <div class="brand">D'Havi Spelt Bagels</div>
+              <div class="brand-tagline">Artisan Spelt Bagels</div>
+            </div>
+            <div class="invoice-title">
+              <h1>INVOICE</h1>
+              <div class="invoice-number">${invoiceNumber}</div>
+            </div>
+          </div>
+          
+          <div class="invoice-details">
+            <div class="detail-section">
+              <h3>Bill To</h3>
+              <p class="name">${selectedOrder.customerName}</p>
+              <p>${selectedOrder.customerEmail}</p>
+              ${selectedOrder.customerPhone ? `<p>${selectedOrder.customerPhone}</p>` : ''}
+              <p>${selectedOrder.deliveryAddress}</p>
+              <p>${selectedOrder.deliveryCity}, ${selectedOrder.deliveryState} ${selectedOrder.deliveryZip}</p>
+            </div>
+            <div class="detail-section" style="text-align: right;">
+              <h3>Invoice Details</h3>
+              <p><strong>Invoice Date:</strong> ${invoiceDate}</p>
+              <p><strong>Order Date:</strong> ${orderDate}</p>
+              <p><strong>Order ID:</strong> #${selectedOrder.id.slice(0, 8)}</p>
+              <p><strong>Fulfillment:</strong> ${format(new Date(selectedOrder.fulfillmentDate), "MMM d, yyyy")}</p>
+            </div>
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(selectedOrder as any).items?.map((item: any) => `
+                <tr>
+                  <td>
+                    <div class="item-name">${item.product?.name || "Product"}</div>
+                    ${item.product?.description ? `<div class="item-desc">${item.product.description.slice(0, 50)}...</div>` : ''}
+                  </td>
+                  <td>${item.quantity}</td>
+                  <td>$${(parseFloat(item.total) / item.quantity).toFixed(2)}</td>
+                  <td>$${parseFloat(item.total).toFixed(2)}</td>
+                </tr>
+              `).join("") || ""}
+            </tbody>
+          </table>
+          
+          <div class="totals">
+            <div class="total-row subtotal">
+              <span>Subtotal</span>
+              <span>$${parseFloat(selectedOrder.subtotal).toFixed(2)}</span>
+            </div>
+            <div class="total-row">
+              <span>Tax</span>
+              <span>$${(parseFloat(selectedOrder.total) - parseFloat(selectedOrder.subtotal)).toFixed(2)}</span>
+            </div>
+            <div class="total-row grand-total">
+              <span>Total</span>
+              <span>$${parseFloat(selectedOrder.total).toFixed(2)}</span>
+            </div>
+          </div>
+          
+          <div class="payment-note">
+            <h4>Payment Information</h4>
+            <p>Payment has been processed via Stripe. Thank you for your order!</p>
+          </div>
+          
+          <div class="footer">
+            <p>Thank you for choosing D'Havi Spelt Bagels!</p>
+            <p>Questions? Contact us at orders@dhavibagels.com</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const invoiceWindow = window.open("", "_blank");
+    if (invoiceWindow) {
+      invoiceWindow.document.write(invoiceContent);
+      invoiceWindow.document.close();
+      invoiceWindow.print();
+    }
+  };
+
+  const getOrderCountByTab = (tab: WorkflowTab) => {
+    const statuses = workflowTabConfig[tab].statuses;
+    return orders?.filter((o) => statuses.includes(o.status)).length || 0;
+  };
+
   const filteredOrders = orders?.filter((o) => {
-    const matchesStatus = statusFilter === "all" || o.status === statusFilter;
+    const matchesTab = workflowTabConfig[activeTab].statuses.includes(o.status);
     const matchesSearch = searchQuery === "" || 
       o.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       o.customerEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
       o.id.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
+    return matchesTab && matchesSearch;
   }) || [];
 
   return (
@@ -197,137 +351,150 @@ export default function AdminOrders() {
           <h1 className="font-serif text-3xl font-bold">Orders</h1>
           <p className="text-muted-foreground mt-1">Manage customer orders</p>
         </div>
-        <div className="flex gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search orders..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 w-[200px]"
-              data-testid="input-search"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Orders</SelectItem>
-              <SelectItem value="new">New</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="baking">Baking</SelectItem>
-              <SelectItem value="ready">Ready</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search orders..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 w-[250px]"
+            data-testid="input-search"
+          />
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" />
-            Order Queue
-            {filteredOrders.length > 0 && (
-              <Badge variant="secondary" className="ml-2">{filteredOrders.length}</Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-20 w-full" />
-              ))}
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>No orders found</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredOrders.map((order) => {
-                const config = statusConfig[order.status];
-                const StatusIcon = config.icon;
-                return (
-                  <div
-                    key={order.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-border hover-elevate gap-4"
-                    data-testid={`order-card-${order.id}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-1 flex-wrap">
-                        <span className="font-semibold truncate">{order.customerName}</span>
-                        <Badge variant="outline" className={config.color}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {config.label}
-                        </Badge>
-                        {order.notes && (
-                          <Badge variant="secondary" className="text-xs">
-                            <FileText className="h-3 w-3 mr-1" />
-                            Has Notes
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {order.customerEmail}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(order.fulfillmentDate), "MMM d, yyyy")} - {order.fulfillmentWindow}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-semibold text-gold text-lg">
-                          ${parseFloat(order.total).toFixed(2)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {order.items?.length || 0} items
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setSelectedOrder(order)}
-                          data-testid={`button-view-${order.id}`}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {order.status === "new" && (
-                          <>
-                            <Button
-                              size="icon"
-                              onClick={() => updateStatusMutation.mutate({ orderId: order.id, status: "approved" })}
-                              disabled={updateStatusMutation.isPending}
-                              className="bg-green-600 hover:bg-green-700"
-                              data-testid={`button-approve-${order.id}`}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              onClick={() => updateStatusMutation.mutate({ orderId: order.id, status: "cancelled" })}
-                              disabled={updateStatusMutation.isPending}
-                              data-testid={`button-cancel-${order.id}`}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as WorkflowTab)} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          {(Object.keys(workflowTabConfig) as WorkflowTab[]).map((tab) => {
+            const TabIcon = workflowTabConfig[tab].icon;
+            const count = getOrderCountByTab(tab);
+            return (
+              <TabsTrigger 
+                key={tab} 
+                value={tab} 
+                className="flex items-center gap-2"
+                data-testid={`tab-${tab}`}
+              >
+                <TabIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">{workflowTabConfig[tab].label}</span>
+                {count > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1.5">
+                    {count}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+
+        {(Object.keys(workflowTabConfig) as WorkflowTab[]).map((tab) => (
+          <TabsContent key={tab} value={tab} className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShoppingCart className="h-5 w-5" />
+                  {workflowTabConfig[tab].label} Orders
+                  {filteredOrders.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">{filteredOrders.length}</Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Skeleton key={i} className="h-20 w-full" />
+                    ))}
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ) : filteredOrders.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No {workflowTabConfig[tab].label.toLowerCase()} orders found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredOrders.map((order) => {
+                      const config = statusConfig[order.status];
+                      const StatusIcon = config.icon;
+                      return (
+                        <div
+                          key={order.id}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-border hover-elevate gap-4"
+                          data-testid={`order-card-${order.id}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-1 flex-wrap">
+                              <span className="font-semibold truncate">{order.customerName}</span>
+                              <Badge variant="outline" className={config.color}>
+                                <StatusIcon className="h-3 w-3 mr-1" />
+                                {config.label}
+                              </Badge>
+                              {order.notes && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <FileText className="h-3 w-3 mr-1" />
+                                  Has Notes
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {order.customerEmail}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {format(new Date(order.fulfillmentDate), "MMM d, yyyy")} - {order.fulfillmentWindow}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="font-semibold text-gold text-lg">
+                                ${parseFloat(order.total).toFixed(2)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {order.items?.length || 0} items
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => setSelectedOrder(order)}
+                                data-testid={`button-view-${order.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {order.status === "new" && (
+                                <>
+                                  <Button
+                                    size="icon"
+                                    onClick={() => updateStatusMutation.mutate({ orderId: order.id, status: "approved" })}
+                                    disabled={updateStatusMutation.isPending}
+                                    className="bg-green-600 hover:bg-green-700"
+                                    data-testid={`button-approve-${order.id}`}
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    size="icon"
+                                    onClick={() => updateStatusMutation.mutate({ orderId: order.id, status: "cancelled" })}
+                                    disabled={updateStatusMutation.isPending}
+                                    data-testid={`button-cancel-${order.id}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
+      </Tabs>
 
       <Dialog open={!!selectedOrder} onOpenChange={() => { setSelectedOrder(null); setEditMode(false); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -335,6 +502,15 @@ export default function AdminOrders() {
             <div className="flex items-center justify-between">
               <DialogTitle className="font-serif">Order Details</DialogTitle>
               <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerateInvoice}
+                  data-testid="button-invoice"
+                >
+                  <Receipt className="h-4 w-4 mr-2" />
+                  Invoice
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
