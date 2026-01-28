@@ -1,9 +1,13 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { createServer } from "http";
+import path from "path";
 
 export const app = express();
 export const httpServer = createServer(app);
+
+// Serve static files from public folder (product images, etc.)
+app.use(express.static(path.resolve(process.cwd(), "public")));
 
 declare module "http" {
   interface IncomingMessage {

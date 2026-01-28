@@ -299,6 +299,42 @@ export async function registerRoutes(
     }
   });
 
+  // Admin: Update order details
+  app.patch("/api/admin/orders/:id", isSimpleAuthenticated, async (req, res) => {
+    try {
+      const orderUpdateSchema = z.object({
+        customerName: z.string().min(1).optional(),
+        customerEmail: z.string().email().optional(),
+        customerPhone: z.string().optional(),
+        deliveryAddress: z.string().optional(),
+        deliveryCity: z.string().optional(),
+        deliveryState: z.string().optional(),
+        deliveryZip: z.string().optional(),
+        deliveryInstructions: z.string().optional(),
+        notes: z.string().optional(),
+      });
+
+      const parseResult = orderUpdateSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Invalid order data",
+          errors: parseResult.error.errors 
+        });
+      }
+
+      const order = await storage.getOrder(req.params.id as string);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const updatedOrder = await storage.updateOrder(req.params.id as string, parseResult.data);
+      res.json(updatedOrder);
+    } catch (error) {
+      console.error("Error updating order:", error);
+      res.status(500).json({ message: "Failed to update order" });
+    }
+  });
+
   // Admin: Get all products (including inactive)
   app.get("/api/admin/products", isSimpleAuthenticated, async (req, res) => {
     try {
@@ -360,6 +396,17 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating product:", error);
       res.status(500).json({ message: "Failed to update product" });
+    }
+  });
+
+  // Admin: Delete product
+  app.delete("/api/admin/products/:id", isSimpleAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteProduct(req.params.id as string);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      res.status(500).json({ message: "Failed to delete product" });
     }
   });
 
