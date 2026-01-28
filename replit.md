@@ -53,14 +53,20 @@ To deploy to Vercel:
 - Low stock alerts when ingredients fall below reorder threshold
 
 ## Recent Changes (January 2026)
+- **Dashboard Restructure**: Renamed and restructured operational pages:
+  - Ingredients → **Pantry** (raw materials inventory)
+  - Production → **Bake** (scheduling, timers, checklists)
+  - Products → **Freezer** (finished goods inventory)
+  - Removed: Analytics, Marketing, standalone Invoices pages
+- **Bake Page Enhancements**: Added baking timers (15/20/25/30 min presets), ingredient checklist when starting batches
+- **Freezer Page**: Now shows finished bagels in storage (from freezer_stock), with inline quantity adjustment
+- **Orders Page Tabs**: Workflow-based tabs (Incoming/In Progress/Completed/Cancelled) + invoice generation
+- **Locations Map**: Interactive Leaflet map with pins for distribution locations, lat/lng coordinate fields
+- **Stock-Aware Ordering**: Public order page now checks freezer availability, prevents overselling
 - **Backend Modularization**: Refactored routes.ts from 841 lines to ~200 lines by extracting feature-based controllers
 - **Freezer Stock Management**: Added freezer_stock table and API endpoints for tracking finished goods inventory
 - **Activity Logging**: Added activity_logs table for audit trail (order.approved, batch.completed, etc.)
-- **Batch Completion Flow**: Enhanced to automatically add products to freezer stock and log activities
-- **Zustand Store**: Added client-side admin state management to reduce prop drilling
-- **Analytics Dashboard**: New `/bakehouse/analytics` page with Recharts visualizations for orders, inventory, and production trends
-- **Server-Side Pagination**: Orders and batches endpoints now return paginated responses with `{items/batches/orders, pagination}` format
-- **UI Panels**: Added FreezerStockPanel and ActivityLogPanel components to dashboard
+- **Server-Side Pagination**: Orders and batches endpoints now return paginated responses
 
 ## File Structure
 
@@ -75,13 +81,11 @@ client/
       bakers-login.tsx     - Baker's Login page
       admin/
         dashboard.tsx      - Bakehouse dashboard (route: /bakehouse)
-        orders.tsx         - Order management (route: /bakehouse/orders)
-        production.tsx     - Batch production (route: /bakehouse/production)
-        products.tsx       - Product catalog (route: /bakehouse/products)
-        ingredients.tsx    - Ingredient inventory (route: /bakehouse/ingredients)
-        locations.tsx      - Location management (route: /bakehouse/locations)
-        marketing.tsx      - Brand assets (route: /bakehouse/marketing)
-        analytics.tsx      - Analytics dashboard (route: /bakehouse/analytics)
+        orders.tsx         - Order management with tabs (route: /bakehouse/orders)
+        bake.tsx           - Baking schedules & timers (route: /bakehouse/bake)
+        freezer.tsx        - Finished goods inventory (route: /bakehouse/freezer)
+        pantry.tsx         - Ingredient inventory (route: /bakehouse/pantry)
+        locations.tsx      - Location management with map (route: /bakehouse/locations)
         components/
           FreezerStockPanel.tsx  - Freezer stock display panel
           ActivityLogPanel.tsx   - Activity log display panel
