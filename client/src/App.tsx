@@ -14,6 +14,7 @@ import LandingPage from "@/pages/landing";
 import OrderPage from "@/pages/order";
 import CheckoutPage from "@/pages/checkout";
 import OrderConfirmationPage from "@/pages/order-confirmation";
+import BakersLogin from "@/pages/bakers-login";
 
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminOrders from "@/pages/admin/orders";
@@ -31,6 +32,7 @@ function PublicRoutes() {
       <Route path="/order" component={OrderPage} />
       <Route path="/checkout/:orderId" component={CheckoutPage} />
       <Route path="/order/confirmation/:orderId" component={OrderConfirmationPage} />
+      <Route path="/bakers-login" component={BakersLogin} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -60,7 +62,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function AdminRoutes() {
+function BakehouseRoutes() {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -72,21 +74,21 @@ function AdminRoutes() {
   }
 
   if (!user) {
-    window.location.href = "/api/login";
+    window.location.href = "/bakers-login";
     return null;
   }
 
   return (
     <AdminLayout>
       <Switch>
-        <Route path="/admin" component={AdminDashboard} />
-        <Route path="/admin/orders" component={AdminOrders} />
-        <Route path="/admin/invoices" component={AdminInvoices} />
-        <Route path="/admin/production" component={AdminProduction} />
-        <Route path="/admin/products" component={AdminProducts} />
-        <Route path="/admin/ingredients" component={AdminIngredients} />
-        <Route path="/admin/locations" component={AdminLocations} />
-        <Route path="/admin/marketing" component={AdminMarketing} />
+        <Route path="/bakehouse" component={AdminDashboard} />
+        <Route path="/bakehouse/orders" component={AdminOrders} />
+        <Route path="/bakehouse/invoices" component={AdminInvoices} />
+        <Route path="/bakehouse/production" component={AdminProduction} />
+        <Route path="/bakehouse/products" component={AdminProducts} />
+        <Route path="/bakehouse/ingredients" component={AdminIngredients} />
+        <Route path="/bakehouse/locations" component={AdminLocations} />
+        <Route path="/bakehouse/marketing" component={AdminMarketing} />
         <Route component={NotFound} />
       </Switch>
     </AdminLayout>
@@ -94,11 +96,18 @@ function AdminRoutes() {
 }
 
 function Router() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   
-  // Check if we're on an admin route
+  // Redirect old /admin routes to /bakehouse
   if (location.startsWith("/admin")) {
-    return <AdminRoutes />;
+    const newPath = location.replace("/admin", "/bakehouse");
+    navigate(newPath, { replace: true });
+    return null;
+  }
+  
+  // Check if we're on a bakehouse route
+  if (location.startsWith("/bakehouse")) {
+    return <BakehouseRoutes />;
   }
   
   return <PublicRoutes />;

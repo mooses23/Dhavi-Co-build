@@ -1,7 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { User } from "@shared/models/auth";
 
-async function fetchUser(): Promise<User | null> {
+interface SimpleUser {
+  username: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}
+
+async function fetchUser(): Promise<SimpleUser | null> {
   const response = await fetch("/api/auth/user", {
     credentials: "include",
   });
@@ -18,12 +24,15 @@ async function fetchUser(): Promise<User | null> {
 }
 
 async function logout(): Promise<void> {
-  window.location.href = "/api/logout";
+  await fetch("/api/auth/logout", {
+    method: "POST",
+    credentials: "include",
+  });
 }
 
 export function useAuth() {
   const queryClient = useQueryClient();
-  const { data: user, isLoading } = useQuery<User | null>({
+  const { data: user, isLoading } = useQuery<SimpleUser | null>({
     queryKey: ["/api/auth/user"],
     queryFn: fetchUser,
     retry: false,
@@ -34,6 +43,7 @@ export function useAuth() {
     mutationFn: logout,
     onSuccess: () => {
       queryClient.setQueryData(["/api/auth/user"], null);
+      window.location.href = "/bakers-login";
     },
   });
 

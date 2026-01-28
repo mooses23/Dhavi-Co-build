@@ -28,42 +28,42 @@ import { Button } from "@/components/ui/button";
 const menuItems = [
   {
     title: "Dashboard",
-    url: "/admin",
+    url: "/bakehouse",
     icon: LayoutDashboard,
   },
   {
     title: "Orders",
-    url: "/admin/orders",
+    url: "/bakehouse/orders",
     icon: ShoppingCart,
   },
   {
     title: "Invoices",
-    url: "/admin/invoices",
+    url: "/bakehouse/invoices",
     icon: FileText,
   },
   {
     title: "Production",
-    url: "/admin/production",
+    url: "/bakehouse/production",
     icon: Factory,
   },
   {
     title: "Products",
-    url: "/admin/products",
+    url: "/bakehouse/products",
     icon: Package,
   },
   {
     title: "Ingredients",
-    url: "/admin/ingredients",
+    url: "/bakehouse/ingredients",
     icon: Wheat,
   },
   {
     title: "Locations",
-    url: "/admin/locations",
+    url: "/bakehouse/locations",
     icon: MapPin,
   },
   {
     title: "Marketing",
-    url: "/admin/marketing",
+    url: "/bakehouse/marketing",
     icon: Image,
   },
 ];
@@ -75,11 +75,11 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4 border-b border-sidebar-border">
-        <Link href="/admin" className="flex items-center gap-2">
+        <Link href="/bakehouse" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-md gold-gradient flex items-center justify-center">
             <span className="font-serif text-lg font-bold text-sidebar">D</span>
           </div>
-          <span className="font-serif text-xl tracking-wide text-gold">D'havi.co</span>
+          <span className="font-serif text-xl tracking-wide text-gold">Bakehouse</span>
         </Link>
       </SidebarHeader>
       <SidebarContent>
@@ -91,7 +91,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
-                    isActive={location === item.url || (item.url !== "/admin" && location.startsWith(item.url))}
+                    isActive={location === item.url || (item.url !== "/bakehouse" && location.startsWith(item.url))}
                   >
                     <Link href={item.url} data-testid={`nav-${item.title.toLowerCase()}`}>
                       <item.icon className="h-4 w-4" />
@@ -109,9 +109,9 @@ export function AppSidebar() {
           <div className="flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {user.firstName} {user.lastName}
+                {user.username || user.firstName}
               </p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">{user.email}</p>
+              <p className="text-xs text-sidebar-foreground/60 truncate">Baker</p>
             </div>
             <Button
               variant="ghost"

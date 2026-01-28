@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { setupSimpleAuth, registerSimpleAuthRoutes, isSimpleAuthenticated } from "./simpleAuth";
 import Stripe from "stripe";
 import { z } from "zod";
 import { insertIngredientSchema, insertProductSchema, insertLocationSchema, insertBatchSchema } from "@shared/schema";
@@ -42,9 +42,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup authentication
-  await setupAuth(app);
-  registerAuthRoutes(app);
+  // Setup simple authentication
+  setupSimpleAuth(app);
+  registerSimpleAuthRoutes(app);
 
   // ==========================================
   // PUBLIC ROUTES (Customer-facing)
@@ -204,7 +204,7 @@ export async function registerRoutes(
   // ==========================================
 
   // Admin: Get all orders (full data)
-  app.get("/api/admin/orders", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/orders", isSimpleAuthenticated, async (req, res) => {
     try {
       const orders = await storage.getOrders();
       res.json(orders);
@@ -215,7 +215,7 @@ export async function registerRoutes(
   });
 
   // Admin: Update order status
-  app.patch("/api/admin/orders/:id/status", isAuthenticated, async (req, res) => {
+  app.patch("/api/admin/orders/:id/status", isSimpleAuthenticated, async (req, res) => {
     try {
       const statusSchema = z.object({ status: z.string().min(1) });
       const parseResult = statusSchema.safeParse(req.body);
@@ -300,7 +300,7 @@ export async function registerRoutes(
   });
 
   // Admin: Get all products (including inactive)
-  app.get("/api/admin/products", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/products", isSimpleAuthenticated, async (req, res) => {
     try {
       const products = await storage.getProducts();
       res.json(products);
@@ -311,7 +311,7 @@ export async function registerRoutes(
   });
 
   // Admin: Create product
-  app.post("/api/admin/products", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/products", isSimpleAuthenticated, async (req, res) => {
     try {
       const { bom, ...productData } = req.body;
       const parseResult = insertProductSchema.safeParse(productData);
@@ -345,7 +345,7 @@ export async function registerRoutes(
   });
 
   // Admin: Update product
-  app.patch("/api/admin/products/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/admin/products/:id", isSimpleAuthenticated, async (req, res) => {
     try {
       const updateSchema = insertProductSchema.partial();
       const parseResult = updateSchema.safeParse(req.body);
@@ -364,7 +364,7 @@ export async function registerRoutes(
   });
 
   // Admin: Get all ingredients
-  app.get("/api/admin/ingredients", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/ingredients", isSimpleAuthenticated, async (req, res) => {
     try {
       const ingredients = await storage.getIngredients();
       res.json(ingredients);
@@ -375,7 +375,7 @@ export async function registerRoutes(
   });
 
   // Admin: Create ingredient
-  app.post("/api/admin/ingredients", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/ingredients", isSimpleAuthenticated, async (req, res) => {
     try {
       const parseResult = insertIngredientSchema.safeParse(req.body);
       if (!parseResult.success) {
@@ -393,7 +393,7 @@ export async function registerRoutes(
   });
 
   // Admin: Update ingredient
-  app.patch("/api/admin/ingredients/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/admin/ingredients/:id", isSimpleAuthenticated, async (req, res) => {
     try {
       const updateSchema = insertIngredientSchema.partial();
       const parseResult = updateSchema.safeParse(req.body);
@@ -412,7 +412,7 @@ export async function registerRoutes(
   });
 
   // Admin: Get all locations (including inactive)
-  app.get("/api/admin/locations", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/locations", isSimpleAuthenticated, async (req, res) => {
     try {
       const locations = await storage.getLocations();
       res.json(locations);
@@ -423,7 +423,7 @@ export async function registerRoutes(
   });
 
   // Admin: Create location
-  app.post("/api/admin/locations", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/locations", isSimpleAuthenticated, async (req, res) => {
     try {
       const parseResult = insertLocationSchema.safeParse(req.body);
       if (!parseResult.success) {
@@ -441,7 +441,7 @@ export async function registerRoutes(
   });
 
   // Admin: Update location
-  app.patch("/api/admin/locations/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/admin/locations/:id", isSimpleAuthenticated, async (req, res) => {
     try {
       const updateSchema = insertLocationSchema.partial();
       const parseResult = updateSchema.safeParse(req.body);
@@ -460,7 +460,7 @@ export async function registerRoutes(
   });
 
   // Admin: Get all batches
-  app.get("/api/admin/batches", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/batches", isSimpleAuthenticated, async (req, res) => {
     try {
       const batches = await storage.getBatches();
       res.json(batches);
@@ -471,7 +471,7 @@ export async function registerRoutes(
   });
 
   // Admin: Create batch
-  app.post("/api/admin/batches", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/batches", isSimpleAuthenticated, async (req, res) => {
     try {
       const parseResult = batchCreateSchema.safeParse(req.body);
       if (!parseResult.success) {
@@ -508,7 +508,7 @@ export async function registerRoutes(
   });
 
   // Admin: Update batch status
-  app.patch("/api/admin/batches/:id/status", isAuthenticated, async (req, res) => {
+  app.patch("/api/admin/batches/:id/status", isSimpleAuthenticated, async (req, res) => {
     try {
       const statusSchema = z.object({ status: z.string().min(1) });
       const parseResult = statusSchema.safeParse(req.body);
@@ -578,7 +578,7 @@ export async function registerRoutes(
   });
 
   // Admin: Dashboard stats
-  app.get("/api/admin/stats/dashboard", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/stats/dashboard", isSimpleAuthenticated, async (req, res) => {
     try {
       const orders = await storage.getOrders();
       const today = new Date();
@@ -611,7 +611,7 @@ export async function registerRoutes(
   // ==========================================
 
   // Admin: Get all invoices
-  app.get("/api/admin/invoices", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/invoices", isSimpleAuthenticated, async (req, res) => {
     try {
       const invoices = await storage.getInvoices();
       res.json(invoices);
@@ -622,7 +622,7 @@ export async function registerRoutes(
   });
 
   // Admin: Get single invoice
-  app.get("/api/admin/invoices/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/invoices/:id", isSimpleAuthenticated, async (req, res) => {
     try {
       const invoice = await storage.getInvoice(req.params.id as string);
       if (!invoice) {
@@ -636,7 +636,7 @@ export async function registerRoutes(
   });
 
   // Admin: Update invoice status
-  app.patch("/api/admin/invoices/:id/status", isAuthenticated, async (req, res) => {
+  app.patch("/api/admin/invoices/:id/status", isSimpleAuthenticated, async (req, res) => {
     try {
       const statusSchema = z.object({ status: z.string().min(1) });
       const parseResult = statusSchema.safeParse(req.body);
@@ -660,7 +660,7 @@ export async function registerRoutes(
   // ==========================================
 
   // Admin: Get inventory adjustments
-  app.get("/api/admin/inventory-adjustments", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/inventory-adjustments", isSimpleAuthenticated, async (req, res) => {
     try {
       const ingredientId = req.query.ingredientId as string | undefined;
       const adjustments = await storage.getInventoryAdjustments(ingredientId);
@@ -672,7 +672,7 @@ export async function registerRoutes(
   });
 
   // Admin: Create inventory adjustment
-  app.post("/api/admin/inventory-adjustments", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/inventory-adjustments", isSimpleAuthenticated, async (req, res) => {
     try {
       const adjustmentSchema = z.object({
         ingredientId: z.string().min(1),
