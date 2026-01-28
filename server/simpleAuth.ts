@@ -88,12 +88,18 @@ export function registerSimpleAuthRoutes(app: Express) {
     try {
       const { username, password } = req.body;
       
-      console.log("Login attempt for username:", username ? "(provided)" : "(missing)");
+      console.log("Login attempt for username:", username ? `"${username}"` : "(missing)");
+      console.log("Password provided:", password ? "yes" : "no");
 
       if (!username || !password) {
         console.log("Login failed: Missing credentials");
         return res.status(400).json({ message: "Username and password are required" });
       }
+
+      // Debug: Check what's being compared
+      console.log("Username match:", username === VALID_USERNAME);
+      console.log("Password match:", password === VALID_PASSWORD);
+      console.log("Expected username:", VALID_USERNAME);
 
       if (username === VALID_USERNAME && password === VALID_PASSWORD) {
         console.log("Credentials valid, attempting to create session...");
