@@ -9,8 +9,8 @@
  * Usage: node script/test-db-connection.js
  */
 
-import pg from 'pg';
-import dotenv from 'dotenv';
+const pg = require('pg');
+const dotenv = require('dotenv');
 
 // Load environment variables
 dotenv.config();
@@ -31,8 +31,9 @@ async function testConnection() {
   }
   
   console.log('✓ DATABASE_URL is set');
-  console.log(`  Host: ${new URL(process.env.DATABASE_URL).hostname}`);
-  console.log(`  Database: ${new URL(process.env.DATABASE_URL).pathname.slice(1)}\n`);
+  const dbUrl = new URL(process.env.DATABASE_URL);
+  console.log(`  Host: ${dbUrl.hostname}`);
+  console.log(`  Database: ${dbUrl.pathname.slice(1)}\n`);
   
   // Create pool
   const pool = new Pool({

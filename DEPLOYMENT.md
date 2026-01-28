@@ -124,18 +124,18 @@ After deployment, test these endpoints:
    ```
    Should return list of products
 
-3. **Login** (test with credentials):
-   - Username: `Dhavi.co`
-   - Password: `SpeltBagels`
+3. **Login** (test with your credentials):
    ```
    POST https://your-app.vercel.app/api/auth/login
    Content-Type: application/json
    
    {
-     "username": "Dhavi.co",
-     "password": "SpeltBagels"
+     "username": "your-username",
+     "password": "your-password"
    }
    ```
+
+> **Note**: The default credentials in the code are for testing only. Change them in `server/simpleAuth.ts` before deploying to production by setting `VALID_USERNAME` and `VALID_PASSWORD` as environment variables or hardcoding secure values.
 
 ### Security Notes
 

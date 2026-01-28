@@ -19,8 +19,6 @@ export const pool = new Pool({
   connectionTimeoutMillis: 10000,
   // Add idle timeout
   idleTimeoutMillis: 30000,
-  // Log connection errors
-  log: (msg) => console.log("DB Pool:", msg),
 });
 
 // Handle pool errors

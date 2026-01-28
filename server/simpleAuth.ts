@@ -21,14 +21,16 @@ declare module "express-session" {
   }
 }
 
-export function setupSimpleAuth(app: Express) {
+export async function setupSimpleAuth(app: Express) {
   app.set("trust proxy", 1);
   
-  // Test database connection on startup
-  pool.query("SELECT 1").then(() => {
+  // Test database connection and ensure session table exists before setting up session store
+  try {
+    await pool.query("SELECT 1");
     console.log("Database connection successful");
-    // Try to ensure session table exists
-    return pool.query(`
+    
+    // Ensure session table exists
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS "session" (
         "sid" varchar NOT NULL COLLATE "default",
         "sess" json NOT NULL,
@@ -36,11 +38,11 @@ export function setupSimpleAuth(app: Express) {
         CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
       )
     `);
-  }).then(() => {
     console.log("Session table ready");
-  }).catch((error) => {
+  } catch (error) {
     console.error("Database setup error:", error);
-  });
+    throw error; // Fail fast if database setup fails
+  }
   
   const sessionStore = new PgSession({
     pool: pool,
@@ -75,7 +77,7 @@ export function registerSimpleAuthRoutes(app: Express) {
     try {
       const { username, password } = req.body;
       
-      console.log("Login attempt for username:", username);
+      console.log("Login attempt for username:", username ? "(provided)" : "(missing)");
 
       if (!username || !password) {
         console.log("Login failed: Missing credentials");
@@ -110,10 +112,9 @@ export function registerSimpleAuthRoutes(app: Express) {
           });
         } catch (sessionError) {
           console.error("Session error during login:", sessionError);
-          // Return a more specific error message
+          // Return generic error message without exposing internal details
           return res.status(500).json({ 
-            message: "Failed to create session. Please check database connection.",
-            error: sessionError instanceof Error ? sessionError.message : "Unknown error"
+            message: "Failed to create session. Please try again or contact support."
           });
         }
       }
@@ -122,11 +123,11 @@ export function registerSimpleAuthRoutes(app: Express) {
       return res.status(401).json({ message: "Invalid username or password" });
     } catch (error) {
       console.error("Login error (caught at top level):", error);
-      // Return more detailed error information
-      return res.status(500).json({ 
-        message: "Login failed. Please try again.",
-        error: error instanceof Error ? error.message : "Unknown error"
-      });
+      // Return generic error message in production, detailed in development
+      const message = process.env.NODE_ENV === "development" && error instanceof Error
+        ? error.message
+        : "Login failed. Please try again.";
+      return res.status(500).json({ message });
     }
   });
 
