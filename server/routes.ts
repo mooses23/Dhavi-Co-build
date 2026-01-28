@@ -7,9 +7,18 @@ import Stripe from "stripe";
 import { z } from "zod";
 import { insertIngredientSchema, insertProductSchema, insertLocationSchema, insertBatchSchema } from "../shared/schema.js";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-12-15.clover",
-});
+let _stripe: Stripe | null = null;
+function getStripe(): Stripe {
+  if (!_stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error("STRIPE_SECRET_KEY must be set in environment variables");
+    }
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: "2025-12-15.clover",
+    });
+  }
+  return _stripe;
+}
 
 // Validation schemas
 const orderCreateSchema = z.object({
@@ -150,7 +159,7 @@ export async function registerRoutes(
       }
 
       // Create Stripe PaymentIntent with manual capture
-      const paymentIntent = await stripe.paymentIntents.create({
+      const paymentIntent = await getStripe().paymentIntents.create({
         amount: Math.round(subtotal * 100), // cents
         currency: "usd",
         capture_method: "manual",
@@ -262,7 +271,7 @@ export async function registerRoutes(
       if (status === "approved" && order.stripePaymentIntentId) {
         // Capture payment when approved
         try {
-          await stripe.paymentIntents.capture(order.stripePaymentIntentId);
+          await getStripe().paymentIntents.capture(order.stripePaymentIntentId);
           await storage.updateOrder(order.id, { stripePaymentStatus: "captured" });
         } catch (stripeError: any) {
           console.error("Stripe capture error:", stripeError);
@@ -312,7 +321,7 @@ export async function registerRoutes(
       } else if (status === "cancelled" && order.stripePaymentIntentId && order.stripePaymentStatus !== "captured") {
         // Cancel authorization if not yet captured
         try {
-          await stripe.paymentIntents.cancel(order.stripePaymentIntentId);
+          await getStripe().paymentIntents.cancel(order.stripePaymentIntentId);
           await storage.updateOrder(order.id, { stripePaymentStatus: "cancelled" });
         } catch (stripeError) {
           console.error("Stripe cancel error:", stripeError);
