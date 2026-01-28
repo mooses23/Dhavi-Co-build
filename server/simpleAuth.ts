@@ -6,6 +6,10 @@ import { pool } from "./db";
 const VALID_USERNAME = "Dhavi.co";
 const VALID_PASSWORD = "SpeltBagels";
 
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  console.warn("WARNING: SESSION_SECRET not set in production. Using fallback secret.");
+}
+
 const PgSession = connectPgSimple(session);
 
 declare module "express-session" {
@@ -34,7 +38,7 @@ export function setupSimpleAuth(app: Express) {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000,
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        sameSite: "lax",
       },
     })
   );
