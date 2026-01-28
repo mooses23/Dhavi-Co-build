@@ -1,5 +1,5 @@
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
-import { db } from "./db";
+import { db } from "./db.js";
 import {
   ingredients,
   products,

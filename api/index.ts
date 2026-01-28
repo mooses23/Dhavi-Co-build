@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { app, initializeRoutes } from "../server/app";
+import { app, initializeRoutes } from "../server/app.js";
 
 let initialized = false;
 
