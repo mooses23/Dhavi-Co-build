@@ -10,15 +10,17 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Configure pool with better error handling and connection settings
+// Configure pool with better error handling and connection settings for Vercel serverless
 export const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
   // Vercel serverless functions need smaller pool sizes
   max: 1,
   // Add connection timeout
   connectionTimeoutMillis: 10000,
-  // Add idle timeout
-  idleTimeoutMillis: 30000,
+  // Short idle timeout for serverless - prevents stale connections with PgBouncer
+  idleTimeoutMillis: 5000,
+  // Ensure SSL is configured for Supabase
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
 });
 
 // Handle pool errors

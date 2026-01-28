@@ -29,7 +29,7 @@ export async function setupSimpleAuth(app: Express) {
     await pool.query("SELECT 1");
     console.log("Database connection successful");
     
-    // Ensure session table exists
+    // Ensure session table exists with proper structure
     await pool.query(`
       CREATE TABLE IF NOT EXISTS "session" (
         "sid" varchar NOT NULL COLLATE "default",
@@ -38,6 +38,12 @@ export async function setupSimpleAuth(app: Express) {
         CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
       )
     `);
+    
+    // Create index on expire column for faster session pruning
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire")
+    `);
+    
     console.log("Session table ready");
   } catch (error) {
     console.error("Database setup error:", error);
@@ -47,7 +53,10 @@ export async function setupSimpleAuth(app: Express) {
   const sessionStore = new PgSession({
     pool: pool,
     tableName: "session",
-    createTableIfMissing: true,
+    // Disable auto table creation since we create it manually above
+    createTableIfMissing: false,
+    // Enable session pruning to clean up expired sessions
+    pruneSessionInterval: 60, // Prune every 60 seconds
     errorLog: (error) => {
       console.error("Session store error:", error);
     },
@@ -148,7 +157,13 @@ export function registerSimpleAuthRoutes(app: Express) {
       if (err) {
         return res.status(500).json({ message: "Failed to logout" });
       }
-      res.clearCookie("connect.sid");
+      // Clear the correct cookie name that matches the session config
+      res.clearCookie("dhavi.sid", {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production"
+      });
       return res.json({ success: true });
     });
   });
