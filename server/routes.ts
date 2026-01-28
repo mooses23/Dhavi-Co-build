@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { setupSimpleAuth, registerSimpleAuthRoutes, isSimpleAuthenticated } from "./simpleAuth";
-import { pool } from "./db";
+import { storage } from "./storage.js";
+import { setupSimpleAuth, registerSimpleAuthRoutes, isSimpleAuthenticated } from "./simpleAuth.js";
+import { pool } from "./db.js";
 import Stripe from "stripe";
 import { z } from "zod";
 import { insertIngredientSchema, insertProductSchema, insertLocationSchema, insertBatchSchema } from "@shared/schema";
