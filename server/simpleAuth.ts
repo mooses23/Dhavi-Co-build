@@ -21,8 +21,28 @@ declare module "express-session" {
   }
 }
 
-export function setupSimpleAuth(app: Express) {
+export async function setupSimpleAuth(app: Express) {
   app.set("trust proxy", 1);
+  
+  // Test database connection and ensure session table exists before setting up session store
+  try {
+    await pool.query("SELECT 1");
+    console.log("Database connection successful");
+    
+    // Ensure session table exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "session" (
+        "sid" varchar NOT NULL COLLATE "default",
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
+      )
+    `);
+    console.log("Session table ready");
+  } catch (error) {
+    console.error("Database setup error:", error);
+    throw error; // Fail fast if database setup fails
+  }
   
   const sessionStore = new PgSession({
     pool: pool,
@@ -56,34 +76,58 @@ export function registerSimpleAuthRoutes(app: Express) {
     
     try {
       const { username, password } = req.body;
+      
+      console.log("Login attempt for username:", username ? "(provided)" : "(missing)");
 
       if (!username || !password) {
+        console.log("Login failed: Missing credentials");
         return res.status(400).json({ message: "Username and password are required" });
       }
 
       if (username === VALID_USERNAME && password === VALID_PASSWORD) {
-        req.session.user = {
-          username,
-          loggedInAt: new Date().toISOString(),
-        };
+        console.log("Credentials valid, attempting to create session...");
         
-        await new Promise<void>((resolve, reject) => {
-          req.session.save((err) => {
-            if (err) reject(err);
-            else resolve();
+        try {
+          req.session.user = {
+            username,
+            loggedInAt: new Date().toISOString(),
+          };
+          
+          await new Promise<void>((resolve, reject) => {
+            req.session.save((err) => {
+              if (err) {
+                console.error("Session save error:", err);
+                reject(err);
+              } else {
+                console.log("Session saved successfully");
+                resolve();
+              }
+            });
           });
-        });
-        
-        return res.json({ 
-          success: true,
-          user: { username }
-        });
+          
+          console.log("Login successful");
+          return res.json({ 
+            success: true,
+            user: { username }
+          });
+        } catch (sessionError) {
+          console.error("Session error during login:", sessionError);
+          // Return generic error message without exposing internal details
+          return res.status(500).json({ 
+            message: "Failed to create session. Please try again or contact support."
+          });
+        }
       }
 
+      console.log("Login failed: Invalid credentials");
       return res.status(401).json({ message: "Invalid username or password" });
     } catch (error) {
-      console.error("Login error:", error);
-      return res.status(500).json({ message: "Login failed. Please try again." });
+      console.error("Login error (caught at top level):", error);
+      // Return generic error message in production, detailed in development
+      const message = process.env.NODE_ENV === "development" && error instanceof Error
+        ? error.message
+        : "Login failed. Please try again.";
+      return res.status(500).json({ message });
     }
   });
 

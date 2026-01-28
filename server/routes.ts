@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupSimpleAuth, registerSimpleAuthRoutes, isSimpleAuthenticated } from "./simpleAuth";
+import { pool } from "./db";
 import Stripe from "stripe";
 import { z } from "zod";
 import { insertIngredientSchema, insertProductSchema, insertLocationSchema, insertBatchSchema } from "@shared/schema";
@@ -42,9 +43,36 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup simple authentication
-  setupSimpleAuth(app);
+  // Setup simple authentication (now async to ensure DB is ready)
+  await setupSimpleAuth(app);
   registerSimpleAuthRoutes(app);
+
+  // Health check endpoint
+  // TODO: Add rate limiting to prevent abuse
+  app.get("/api/health", async (req, res) => {
+    try {
+      // Check database connection
+      await pool.query("SELECT 1");
+      
+      res.json({
+        status: "ok",
+        database: "connected",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Health check failed:", error);
+      // Don't expose internal error details in production
+      const errorMessage = process.env.NODE_ENV === "development" && error instanceof Error
+        ? error.message
+        : "Service unavailable";
+      
+      res.status(503).json({
+        status: "error",
+        message: errorMessage,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
 
   // ==========================================
   // PUBLIC ROUTES (Customer-facing)
