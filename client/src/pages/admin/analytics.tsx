@@ -61,6 +61,7 @@ export default function Analytics() {
 
   const ordersByDay = last7Days.map((day) => {
     const dayOrders = orders?.filter((order) => {
+      if (!order.createdAt) return false;
       const orderDate = startOfDay(new Date(order.createdAt));
       return orderDate.getTime() === day.fullDate.getTime();
     }) || [];
