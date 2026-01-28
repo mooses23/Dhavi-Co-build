@@ -4,7 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Re-export auth models
-export * from "./models/auth.js";
+export * from "./models/auth";
 
 // ============================================
 // INGREDIENTS - The truth layer
@@ -385,6 +385,93 @@ export const insertInventoryAdjustmentSchema = createInsertSchema(inventoryAdjus
 
 export type InsertInventoryAdjustment = z.infer<typeof insertInventoryAdjustmentSchema>;
 export type InventoryAdjustment = typeof inventoryAdjustments.$inferSelect;
+
+// ============================================
+// FREEZER STOCK - Track finished products in freezer storage
+// ============================================
+export const freezerStock = pgTable("freezer_stock", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").notNull().references(() => products.id),
+  quantity: integer("quantity").notNull().default(0),
+  batchId: varchar("batch_id").references(() => batches.id),
+  frozenAt: timestamp("frozen_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_freezer_stock_product").on(table.productId),
+  index("idx_freezer_stock_batch").on(table.batchId),
+]);
+
+export const freezerStockRelations = relations(freezerStock, ({ one }) => ({
+  product: one(products, {
+    fields: [freezerStock.productId],
+    references: [products.id],
+  }),
+  batch: one(batches, {
+    fields: [freezerStock.batchId],
+    references: [batches.id],
+  }),
+}));
+
+export const insertFreezerStockSchema = createInsertSchema(freezerStock).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFreezerStock = z.infer<typeof insertFreezerStockSchema>;
+export type FreezerStock = typeof freezerStock.$inferSelect;
+
+// ============================================
+// ACTIVITY LOGS - Audit trail for all actions
+// ============================================
+export const activityLogs = pgTable("activity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  actionType: text("action_type").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: varchar("entity_id"),
+  userId: text("user_id"),
+  userName: text("user_name"),
+  details: jsonb("details"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_activity_logs_entity").on(table.entityType, table.entityId),
+  index("idx_activity_logs_user").on(table.userId),
+  index("idx_activity_logs_created").on(table.createdAt),
+]);
+
+export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type ActivityLog = typeof activityLogs.$inferSelect;
+
+// Activity log action types
+export const ACTIVITY_ACTIONS = [
+  "order.created",
+  "order.approved", 
+  "order.cancelled",
+  "order.updated",
+  "batch.created",
+  "batch.started",
+  "batch.completed",
+  "batch.cancelled",
+  "ingredient.restocked",
+  "ingredient.adjusted",
+  "product.created",
+  "product.updated",
+  "product.deleted",
+  "freezer.stocked",
+  "freezer.depleted",
+  "invoice.created",
+  "invoice.paid",
+] as const;
+export type ActivityAction = typeof ACTIVITY_ACTIONS[number];
 
 // ============================================
 // Order status enum for type safety

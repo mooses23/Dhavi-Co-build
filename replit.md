@@ -52,6 +52,13 @@ To deploy to Vercel:
 - Batch completion deducts ingredients from inventory
 - Low stock alerts when ingredients fall below reorder threshold
 
+## Recent Changes (January 2026)
+- **Backend Modularization**: Refactored routes.ts from 841 lines to ~200 lines by extracting feature-based controllers
+- **Freezer Stock Management**: Added freezer_stock table and API endpoints for tracking finished goods inventory
+- **Activity Logging**: Added activity_logs table for audit trail (order.approved, batch.completed, etc.)
+- **Batch Completion Flow**: Enhanced to automatically add products to freezer stock and log activities
+- **Zustand Store**: Added client-side admin state management to reduce prop drilling
+
 ## File Structure
 
 ```
@@ -71,15 +78,30 @@ client/
         ingredients.tsx    - Ingredient inventory (route: /bakehouse/ingredients)
         locations.tsx      - Location management (route: /bakehouse/locations)
         marketing.tsx      - Brand assets (route: /bakehouse/marketing)
+    stores/
+      adminStore.ts        - Zustand store for admin state management
     components/
       app-sidebar.tsx      - Bakehouse navigation
       theme-toggle.tsx     - Dark/light mode toggle
 
 server/
-  routes.ts               - API endpoints
+  routes.ts               - API route registration
   storage.ts              - Database operations
   db.ts                   - Database connection
   simpleAuth.ts           - Simple session-based authentication
+  controllers/
+    index.ts              - Controller exports
+    health.controller.ts  - Health check
+    products.controller.ts - Product management
+    ingredients.controller.ts - Ingredient management
+    orders.controller.ts  - Order management
+    batches.controller.ts - Batch production
+    freezer.controller.ts - Freezer stock management
+    activity.controller.ts - Activity logging
+    invoices.controller.ts - Invoice management
+    locations.controller.ts - Location management
+    marketing.controller.ts - Marketing assets
+    stats.controller.ts   - Dashboard statistics
 
 shared/
   schema.ts               - Drizzle database schema
@@ -97,16 +119,33 @@ shared/
 
 ### Protected (Admin)
 - `GET /api/admin/orders` - List all orders
-- `PATCH /api/orders/:id/status` - Update order status (triggers payment capture/cancel)
-- `POST /api/products` - Create product
-- `PATCH /api/products/:id` - Update product
-- `POST /api/ingredients` - Create ingredient
-- `PATCH /api/ingredients/:id` - Update ingredient
-- `POST /api/locations` - Create location
-- `PATCH /api/locations/:id` - Update location
-- `GET /api/batches` - List batches
-- `POST /api/batches` - Create batch
-- `PATCH /api/batches/:id/status` - Update batch status (deducts ingredients on completion)
+- `PATCH /api/admin/orders/:id/status` - Update order status (triggers payment capture/cancel)
+- `GET /api/admin/products` - List all products
+- `POST /api/admin/products` - Create product
+- `PATCH /api/admin/products/:id` - Update product
+- `GET /api/admin/products/:id/bom` - Get product bill of materials
+- `PUT /api/admin/products/:id/bom` - Update product bill of materials
+- `GET /api/admin/ingredients` - List all ingredients
+- `POST /api/admin/ingredients` - Create ingredient
+- `PATCH /api/admin/ingredients/:id` - Update ingredient
+- `POST /api/admin/ingredients/:id/adjust` - Adjust ingredient inventory
+- `GET /api/admin/locations` - List all locations
+- `POST /api/admin/locations` - Create location
+- `PATCH /api/admin/locations/:id` - Update location
+- `GET /api/admin/locations/:id/inventory` - Get location inventory
+- `GET /api/admin/batches` - List batches
+- `POST /api/admin/batches` - Create batch
+- `PATCH /api/admin/batches/:id/status` - Update batch status (deducts ingredients, adds to freezer)
+- `GET /api/admin/freezer` - Get freezer stock
+- `GET /api/admin/freezer/product/:productId` - Get freezer stock by product
+- `POST /api/admin/freezer` - Add to freezer stock
+- `PATCH /api/admin/freezer/:id` - Update freezer stock quantity
+- `GET /api/admin/activity` - Get activity logs
+- `GET /api/admin/activity/recent` - Get recent activity
+- `GET /api/admin/stats/dashboard` - Dashboard statistics
+- `GET /api/admin/stats/orders` - Order statistics
+- `GET /api/admin/stats/inventory` - Inventory statistics
+- `GET /api/admin/stats/freezer` - Freezer statistics
 
 ## Order Lifecycle
 1. **New**: Customer placed order, payment authorized

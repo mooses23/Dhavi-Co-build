@@ -14,6 +14,8 @@ import {
   invoices,
   invoiceItems,
   inventoryAdjustments,
+  freezerStock,
+  activityLogs,
   type Ingredient,
   type InsertIngredient,
   type Product,
@@ -40,6 +42,10 @@ import {
   type InsertInvoiceItem,
   type InventoryAdjustment,
   type InsertInventoryAdjustment,
+  type FreezerStock,
+  type InsertFreezerStock,
+  type ActivityLog,
+  type InsertActivityLog,
 } from "../shared/schema.js";
 
 export interface IStorage {
@@ -71,6 +77,7 @@ export interface IStorage {
   // Batches
   getBatches(): Promise<(Batch & { items: (BatchItem & { product: Product })[] })[]>;
   getBatch(id: string): Promise<Batch | undefined>;
+  getBatchItems(batchId: string): Promise<BatchItem[]>;
   createBatch(data: InsertBatch): Promise<Batch>;
   updateBatchStatus(id: string, status: string): Promise<Batch | undefined>;
   createBatchItem(data: InsertBatchItem): Promise<BatchItem>;
@@ -104,6 +111,18 @@ export interface IStorage {
   getInventoryAdjustments(ingredientId?: string): Promise<(InventoryAdjustment & { ingredient: Ingredient })[]>;
   createInventoryAdjustment(data: InsertInventoryAdjustment): Promise<InventoryAdjustment>;
   adjustIngredientInventory(ingredientId: string, quantity: number, type: string, reason?: string, adjustedBy?: string): Promise<InventoryAdjustment>;
+
+  // Freezer Stock
+  getFreezerStock(): Promise<(FreezerStock & { product: Product })[]>;
+  getFreezerStockByProduct(productId: string): Promise<FreezerStock[]>;
+  createFreezerStock(data: InsertFreezerStock): Promise<FreezerStock>;
+  updateFreezerStock(id: string, quantity: number): Promise<FreezerStock | undefined>;
+  addToFreezerFromBatch(batchId: string, items: { productId: string; quantity: number }[]): Promise<void>;
+
+  // Activity Logs
+  getActivityLogs(options?: { entityType?: string; entityId?: string; limit?: number }): Promise<ActivityLog[]>;
+  createActivityLog(data: InsertActivityLog): Promise<ActivityLog>;
+  logActivity(actionType: string, entityType: string, entityId?: string, details?: any, userId?: string, userName?: string): Promise<ActivityLog>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -529,6 +548,109 @@ export class DatabaseStorage implements IStorage {
     });
 
     return adjustment;
+  }
+
+  // Freezer Stock
+  async getFreezerStock(): Promise<(FreezerStock & { product: Product })[]> {
+    const stock = await db
+      .select()
+      .from(freezerStock)
+      .innerJoin(products, eq(freezerStock.productId, products.id))
+      .orderBy(desc(freezerStock.createdAt));
+    
+    return stock.map((row: any) => ({
+      ...(row.freezer_stock || row.freezerStock),
+      product: row.products,
+    }));
+  }
+
+  async getFreezerStockByProduct(productId: string): Promise<FreezerStock[]> {
+    return db.select().from(freezerStock).where(eq(freezerStock.productId, productId));
+  }
+
+  async createFreezerStock(data: InsertFreezerStock): Promise<FreezerStock> {
+    const [stock] = await db.insert(freezerStock).values(data).returning();
+    return stock;
+  }
+
+  async updateFreezerStock(id: string, quantity: number): Promise<FreezerStock | undefined> {
+    const [stock] = await db
+      .update(freezerStock)
+      .set({ quantity, updatedAt: new Date() })
+      .where(eq(freezerStock.id, id))
+      .returning();
+    return stock;
+  }
+
+  async addToFreezerFromBatch(batchId: string, items: { productId: string; quantity: number }[]): Promise<void> {
+    for (const item of items) {
+      const [existing] = await db
+        .select()
+        .from(freezerStock)
+        .where(and(
+          eq(freezerStock.productId, item.productId),
+          eq(freezerStock.batchId, batchId)
+        ));
+
+      if (existing) {
+        await db
+          .update(freezerStock)
+          .set({ 
+            quantity: existing.quantity + item.quantity,
+            updatedAt: new Date() 
+          })
+          .where(eq(freezerStock.id, existing.id));
+      } else {
+        await db.insert(freezerStock).values({
+          productId: item.productId,
+          quantity: item.quantity,
+          batchId,
+        });
+      }
+    }
+  }
+
+  // Activity Logs
+  async getActivityLogs(options?: { entityType?: string; entityId?: string; limit?: number }): Promise<ActivityLog[]> {
+    let query = db.select().from(activityLogs).orderBy(desc(activityLogs.createdAt));
+    
+    if (options?.entityType && options?.entityId) {
+      query = query.where(and(
+        eq(activityLogs.entityType, options.entityType),
+        eq(activityLogs.entityId, options.entityId)
+      )) as any;
+    } else if (options?.entityType) {
+      query = query.where(eq(activityLogs.entityType, options.entityType)) as any;
+    }
+
+    if (options?.limit) {
+      query = query.limit(options.limit) as any;
+    }
+
+    return query;
+  }
+
+  async createActivityLog(data: InsertActivityLog): Promise<ActivityLog> {
+    const [log] = await db.insert(activityLogs).values(data).returning();
+    return log;
+  }
+
+  async logActivity(
+    actionType: string,
+    entityType: string,
+    entityId?: string,
+    details?: any,
+    userId?: string,
+    userName?: string
+  ): Promise<ActivityLog> {
+    return this.createActivityLog({
+      actionType,
+      entityType,
+      entityId,
+      details,
+      userId,
+      userName,
+    });
   }
 }
 
