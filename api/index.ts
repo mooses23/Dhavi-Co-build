@@ -16,6 +16,21 @@ async function ensureInitialized() {
       throw new Error("DATABASE_URL environment variable is not set. Please add it in Vercel Project Settings → Environment Variables.");
     }
     
+    // Log the DATABASE_URL hostname for debugging (not the full URL for security)
+    try {
+      const dbUrl = new URL(process.env.DATABASE_URL);
+      console.log("DATABASE_URL hostname:", dbUrl.hostname);
+      console.log("DATABASE_URL port:", dbUrl.port);
+      
+      // Validate it's using the pooler format
+      if (dbUrl.hostname.startsWith("db.") && dbUrl.hostname.endsWith(".supabase.co")) {
+        console.error("WARNING: DATABASE_URL appears to be using direct connection format (db.xxx.supabase.co).");
+        console.error("For serverless, use the Transaction Pooler format: aws-0-[region].pooler.supabase.com:6543");
+      }
+    } catch (e) {
+      console.error("Could not parse DATABASE_URL:", e);
+    }
+    
     // Dynamic import to ensure env vars are checked first
     appModule = await import("../server/app.js");
     await appModule.initializeRoutes();
