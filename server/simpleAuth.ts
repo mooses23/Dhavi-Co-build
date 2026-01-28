@@ -24,16 +24,22 @@ declare module "express-session" {
 export function setupSimpleAuth(app: Express) {
   app.set("trust proxy", 1);
   
+  const sessionStore = new PgSession({
+    pool: pool,
+    tableName: "session",
+    createTableIfMissing: true,
+    errorLog: (error) => {
+      console.error("Session store error:", error);
+    },
+  });
+  
   app.use(
     session({
-      store: new PgSession({
-        pool: pool,
-        tableName: "session",
-        createTableIfMissing: true,
-      }),
+      store: sessionStore,
       secret: process.env.SESSION_SECRET || "dhavi-bakehouse-secret-key-2024",
       resave: false,
       saveUninitialized: false,
+      name: "dhavi.sid",
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
@@ -45,32 +51,40 @@ export function setupSimpleAuth(app: Express) {
 }
 
 export function registerSimpleAuthRoutes(app: Express) {
-  app.post("/api/auth/login", (req, res) => {
-    const { username, password } = req.body;
+  app.post("/api/auth/login", async (req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    
+    try {
+      const { username, password } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ message: "Username and password are required" });
-    }
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
 
-    if (username === VALID_USERNAME && password === VALID_PASSWORD) {
-      req.session.user = {
-        username,
-        loggedInAt: new Date().toISOString(),
-      };
-      req.session.save((err) => {
-        if (err) {
-          console.error("Session save error:", err);
-          return res.status(500).json({ message: "Failed to create session" });
-        }
+      if (username === VALID_USERNAME && password === VALID_PASSWORD) {
+        req.session.user = {
+          username,
+          loggedInAt: new Date().toISOString(),
+        };
+        
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+        
         return res.json({ 
           success: true,
           user: { username }
         });
-      });
-      return;
-    }
+      }
 
-    return res.status(401).json({ message: "Invalid username or password" });
+      return res.status(401).json({ message: "Invalid username or password" });
+    } catch (error) {
+      console.error("Login error:", error);
+      return res.status(500).json({ message: "Login failed. Please try again." });
+    }
   });
 
   app.get("/api/auth/user", (req, res) => {

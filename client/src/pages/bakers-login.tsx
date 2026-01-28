@@ -41,12 +41,21 @@ export default function BakersLogin() {
         body: JSON.stringify(data),
       });
       
+      const contentType = response.headers.get("content-type");
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Login failed");
+        if (contentType && contentType.includes("application/json")) {
+          const error = await response.json();
+          throw new Error(error.message || "Login failed");
+        }
+        throw new Error(`Login failed (${response.status})`);
       }
       
-      return response.json();
+      if (contentType && contentType.includes("application/json")) {
+        return response.json();
+      }
+      
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
