@@ -14,6 +14,7 @@ import LandingPage from "@/pages/landing";
 import OrderPage from "@/pages/order";
 import CheckoutPage from "@/pages/checkout";
 import OrderConfirmationPage from "@/pages/order-confirmation";
+import TrackOrderPage from "@/pages/track";
 import BakersLogin from "@/pages/bakers-login";
 
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -30,6 +31,7 @@ function PublicRoutes() {
     <Switch>
       <Route path="/" component={LandingPage} />
       <Route path="/order" component={OrderPage} />
+      <Route path="/track" component={TrackOrderPage} />
       <Route path="/checkout/:orderId" component={CheckoutPage} />
       <Route path="/order/confirmation/:orderId" component={OrderConfirmationPage} />
       <Route path="/bakers-login" component={BakersLogin} />
