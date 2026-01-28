@@ -48,6 +48,7 @@ export async function registerRoutes(
   registerSimpleAuthRoutes(app);
 
   // Health check endpoint
+  // TODO: Add rate limiting to prevent abuse
   app.get("/api/health", async (req, res) => {
     try {
       // Check database connection
