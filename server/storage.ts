@@ -40,7 +40,7 @@ import {
   type InsertInvoiceItem,
   type InventoryAdjustment,
   type InsertInventoryAdjustment,
-} from "@shared/schema";
+} from "../shared/schema.js";
 
 export interface IStorage {
   // Ingredients

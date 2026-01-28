@@ -5,7 +5,7 @@ import { setupSimpleAuth, registerSimpleAuthRoutes, isSimpleAuthenticated } from
 import { pool } from "./db.js";
 import Stripe from "stripe";
 import { z } from "zod";
-import { insertIngredientSchema, insertProductSchema, insertLocationSchema, insertBatchSchema } from "@shared/schema";
+import { insertIngredientSchema, insertProductSchema, insertLocationSchema, insertBatchSchema } from "../shared/schema.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-12-15.clover",
