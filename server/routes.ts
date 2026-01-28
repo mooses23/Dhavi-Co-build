@@ -800,7 +800,7 @@ export async function registerRoutes(
     }
 
     try {
-      const event = stripe.webhooks.constructEvent(
+      const event = getStripe().webhooks.constructEvent(
         req.body,
         sig as string,
         webhookSecret
