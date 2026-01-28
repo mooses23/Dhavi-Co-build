@@ -26,7 +26,7 @@ export function setupSimpleAuth(app: Express) {
   
   const sessionStore = new PgSession({
     pool: pool,
-    tableName: "session",
+    tableName: "sessions",
     createTableIfMissing: false,
     errorLog: (error) => {
       console.error("Session store error:", error);
