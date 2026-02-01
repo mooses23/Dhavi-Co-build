@@ -35,14 +35,14 @@ const menuItems = [
     icon: ShoppingCart,
   },
   {
-    title: "Bake",
-    url: "/bakehouse/bake",
-    icon: ChefHat,
-  },
-  {
     title: "Freezer",
     url: "/bakehouse/freezer",
     icon: Snowflake,
+  },
+  {
+    title: "Bake",
+    url: "/bakehouse/bake",
+    icon: ChefHat,
   },
   {
     title: "Pantry",

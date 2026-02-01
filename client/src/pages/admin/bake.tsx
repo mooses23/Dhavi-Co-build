@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,10 +16,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Timer, Plus, CalendarIcon, Play, CheckCircle, Pause, RotateCcw, ChefHat, ClipboardList } from "lucide-react";
-import type { Batch, Product, Ingredient, BillOfMaterial } from "@shared/schema";
+import { Timer, Plus, CalendarIcon, Play, CheckCircle, Pause, RotateCcw, ChefHat, ClipboardList, ChevronDown, ChevronRight, BookOpen, Pencil, Save, X, Snowflake, Package } from "lucide-react";
+import type { Batch, Product, Ingredient, BillOfMaterial, Order } from "@shared/schema";
 
 const batchFormSchema = z.object({
   batchDate: z.date({ required_error: "Batch date is required" }),
@@ -307,11 +308,429 @@ function IngredientChecklist({ batch, onClose, onConfirmStart, isPending }: Ingr
   );
 }
 
+interface RecipeCardProps {
+  product: Product;
+  ingredients: Ingredient[];
+}
+
+function RecipeCard({ product, ingredients }: RecipeCardProps) {
+  const { toast } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedBom, setEditedBom] = useState<Array<{ ingredientId: string; quantity: number }>>([]);
+  
+  const { data: bom, isLoading } = useQuery<(BillOfMaterial & { ingredient: Ingredient })[]>({
+    queryKey: ["/api/admin/products", product.id, "bom"],
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/products/${product.id}/bom`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch BOM");
+      return response.json();
+    },
+  });
+
+  const updateBomMutation = useMutation({
+    mutationFn: async (items: Array<{ ingredientId: string; quantity: number }>) => {
+      return await apiRequest("PUT", `/api/admin/products/${product.id}/bom`, { items });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/products", product.id, "bom"] });
+      toast({ title: "Recipe Updated", description: `${product.name} ingredients have been saved` });
+      setIsEditing(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const startEditing = () => {
+    setEditedBom(
+      bom?.map((item) => ({
+        ingredientId: item.ingredientId,
+        quantity: parseFloat(item.quantity),
+      })) || []
+    );
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditedBom([]);
+  };
+
+  const saveChanges = () => {
+    updateBomMutation.mutate(editedBom.filter((item) => item.quantity > 0));
+  };
+
+  const updateIngredientQuantity = (ingredientId: string, quantity: number) => {
+    setEditedBom((prev) => {
+      const existing = prev.find((item) => item.ingredientId === ingredientId);
+      if (existing) {
+        return prev.map((item) =>
+          item.ingredientId === ingredientId ? { ...item, quantity } : item
+        );
+      }
+      return [...prev, { ingredientId, quantity }];
+    });
+  };
+
+  const addIngredient = (ingredientId: string) => {
+    if (!editedBom.find((item) => item.ingredientId === ingredientId)) {
+      setEditedBom((prev) => [...prev, { ingredientId, quantity: 0 }]);
+    }
+  };
+
+  const removeIngredient = (ingredientId: string) => {
+    setEditedBom((prev) => prev.filter((item) => item.ingredientId !== ingredientId));
+  };
+
+  const getIngredientName = (ingredientId: string) => {
+    return ingredients.find((i) => i.id === ingredientId)?.name || "Unknown";
+  };
+
+  const getIngredientUnit = (ingredientId: string) => {
+    return ingredients.find((i) => i.id === ingredientId)?.unit || "";
+  };
+
+  const availableIngredients = ingredients.filter(
+    (ing) => !editedBom.find((item) => item.ingredientId === ing.id)
+  );
+
+  return (
+    <div className="p-4 rounded-lg border border-border" data-testid={`recipe-card-${product.id}`}>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-semibold">{product.name}</h4>
+        {!isEditing ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={startEditing}
+            data-testid={`button-edit-recipe-${product.id}`}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        ) : (
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={cancelEditing}
+              data-testid={`button-cancel-recipe-${product.id}`}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={saveChanges}
+              disabled={updateBomMutation.isPending}
+              data-testid={`button-save-recipe-${product.id}`}
+            >
+              <Save className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      ) : isEditing ? (
+        <div className="space-y-2">
+          {editedBom.map((item) => (
+            <div
+              key={item.ingredientId}
+              className="flex items-center gap-2"
+              data-testid={`recipe-ingredient-edit-${item.ingredientId}`}
+            >
+              <span className="flex-1 text-sm">{getIngredientName(item.ingredientId)}</span>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                className="w-20"
+                value={item.quantity}
+                onChange={(e) =>
+                  updateIngredientQuantity(item.ingredientId, parseFloat(e.target.value) || 0)
+                }
+                data-testid={`input-recipe-qty-${item.ingredientId}`}
+              />
+              <span className="text-sm text-muted-foreground w-12">
+                {getIngredientUnit(item.ingredientId)}
+              </span>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => removeIngredient(item.ingredientId)}
+                data-testid={`button-remove-ingredient-${item.ingredientId}`}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+          {availableIngredients.length > 0 && (
+            <div className="pt-2">
+              <Select onValueChange={addIngredient}>
+                <SelectTrigger data-testid={`select-add-ingredient-${product.id}`}>
+                  <SelectValue placeholder="Add ingredient..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableIngredients.map((ing) => (
+                    <SelectItem key={ing.id} value={ing.id}>
+                      {ing.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      ) : bom && bom.length > 0 ? (
+        <div className="space-y-1">
+          {bom.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center justify-between text-sm"
+              data-testid={`recipe-ingredient-${item.ingredientId}`}
+            >
+              <span>{item.ingredient.name}</span>
+              <Badge variant="secondary">
+                {parseFloat(item.quantity).toFixed(2)} {item.ingredient.unit}
+              </Badge>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">No ingredients defined</p>
+      )}
+    </div>
+  );
+}
+
+function RecipesSection() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const { data: products } = useQuery<Product[]>({
+    queryKey: ["/api/admin/products"],
+  });
+
+  const { data: ingredients } = useQuery<Ingredient[]>({
+    queryKey: ["/api/admin/ingredients"],
+  });
+
+  const bagelProducts = products?.filter((p) => p.isActive) || [];
+
+  return (
+    <Card data-testid="recipes-section">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CardHeader className="cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
+          <CollapsibleTrigger asChild>
+            <CardTitle className="flex items-center gap-2">
+              {isOpen ? (
+                <ChevronDown className="h-5 w-5" />
+              ) : (
+                <ChevronRight className="h-5 w-5" />
+              )}
+              <BookOpen className="h-5 w-5" />
+              Recipes
+            </CardTitle>
+          </CollapsibleTrigger>
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="space-y-4">
+            {!products || !ingredients ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-24 w-full" />
+                ))}
+              </div>
+            ) : bagelProducts.length === 0 ? (
+              <p className="text-center py-6 text-muted-foreground">
+                No active products found.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {bagelProducts.map((product) => (
+                  <RecipeCard
+                    key={product.id}
+                    product={product}
+                    ingredients={ingredients}
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
+}
+
+interface BatchCompletionDialogProps {
+  batch: Batch & { items: any[] };
+  onClose: () => void;
+  onComplete: (orderId?: string, orderStatus?: string) => void;
+  isPending: boolean;
+}
+
+function BatchCompletionDialog({ batch, onClose, onComplete, isPending }: BatchCompletionDialogProps) {
+  const [completionMode, setCompletionMode] = useState<"freezer" | "order">("freezer");
+  const [freezerQuantities, setFreezerQuantities] = useState<Record<string, number>>({});
+  const [selectedOrderId, setSelectedOrderId] = useState<string>("");
+
+  const { data: ordersResponse } = useQuery<{ orders: (Order & { items: any[] })[]; pagination: any }>({
+    queryKey: ["/api/admin/orders"],
+  });
+
+  const pendingOrders = ordersResponse?.orders?.filter(
+    (o) => o.status === "new" || o.status === "approved"
+  ) || [];
+
+  useEffect(() => {
+    const initialQuantities: Record<string, number> = {};
+    batch.items?.forEach((item: any) => {
+      initialQuantities[item.productId] = item.quantity;
+    });
+    setFreezerQuantities(initialQuantities);
+  }, [batch.items]);
+
+  const handleConfirm = () => {
+    if (completionMode === "order" && selectedOrderId) {
+      onComplete(selectedOrderId, "baking");
+    } else {
+      onComplete();
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 font-serif">
+            <CheckCircle className="h-5 w-5" />
+            Complete Batch
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="py-4 space-y-4">
+          <div>
+            <h4 className="font-medium mb-2">Batch Items</h4>
+            <div className="space-y-2">
+              {batch.items?.map((item: any) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
+                  data-testid={`completion-item-${item.productId}`}
+                >
+                  <span>{item.product?.name}</span>
+                  <Badge variant="secondary">{item.quantity} units</Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div
+              className={`p-3 rounded-lg border cursor-pointer ${
+                completionMode === "freezer" ? "border-primary bg-primary/5" : "border-border"
+              }`}
+              onClick={() => setCompletionMode("freezer")}
+              data-testid="option-add-to-freezer"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <Snowflake className="h-4 w-4" />
+                <span className="font-medium">Add to Freezer</span>
+              </div>
+              {completionMode === "freezer" && (
+                <div className="space-y-2 mt-3">
+                  {batch.items?.map((item: any) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between"
+                      data-testid={`freezer-qty-${item.productId}`}
+                    >
+                      <span className="text-sm">{item.product?.name}</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        className="w-20"
+                        value={freezerQuantities[item.productId] || 0}
+                        onChange={(e) =>
+                          setFreezerQuantities((prev) => ({
+                            ...prev,
+                            [item.productId]: parseInt(e.target.value) || 0,
+                          }))
+                        }
+                        data-testid={`input-freezer-qty-${item.productId}`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div
+              className={`p-3 rounded-lg border cursor-pointer ${
+                completionMode === "order" ? "border-primary bg-primary/5" : "border-border"
+              }`}
+              onClick={() => setCompletionMode("order")}
+              data-testid="option-fulfill-order"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <Package className="h-4 w-4" />
+                <span className="font-medium">Fulfill Order</span>
+              </div>
+              {completionMode === "order" && (
+                <div className="mt-3">
+                  {pendingOrders.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No pending orders available
+                    </p>
+                  ) : (
+                    <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
+                      <SelectTrigger data-testid="select-order-to-fulfill">
+                        <SelectValue placeholder="Select an order..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pendingOrders.map((order) => (
+                          <SelectItem key={order.id} value={order.id}>
+                            {order.customerName} - {format(new Date(order.fulfillmentDate), "MMM d")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={isPending || (completionMode === "order" && !selectedOrderId)}
+            data-testid="button-confirm-complete-batch"
+          >
+            {isPending ? "Completing..." : "Complete Batch"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AdminBake() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [batchItems, setBatchItems] = useState<Record<string, number>>({});
   const [checklistBatch, setChecklistBatch] = useState<(Batch & { items: any[] }) | null>(null);
+  const [completionBatch, setCompletionBatch] = useState<(Batch & { items: any[] }) | null>(null);
 
   const { data: batchesResponse, isLoading } = useQuery<{ batches: (Batch & { items: any[] })[]; pagination: any } | (Batch & { items: any[] })[]>({
     queryKey: ["/api/admin/batches"],
@@ -358,12 +777,27 @@ export default function AdminBake() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/batches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/ingredients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/freezer"] });
       toast({ title: "Batch Updated", description: "Batch status has been updated" });
       setChecklistBatch(null);
+      setCompletionBatch(null);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setChecklistBatch(null);
+      setCompletionBatch(null);
+    },
+  });
+
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
+      return await apiRequest("PATCH", `/api/admin/orders/${orderId}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -380,6 +814,19 @@ export default function AdminBake() {
   const confirmStartBatch = () => {
     if (checklistBatch) {
       updateBatchStatusMutation.mutate({ batchId: checklistBatch.id, status: "in_progress" });
+    }
+  };
+
+  const handleCompleteBatch = (batch: Batch & { items: any[] }) => {
+    setCompletionBatch(batch);
+  };
+
+  const confirmCompleteBatch = async (orderId?: string, orderStatus?: string) => {
+    if (completionBatch) {
+      await updateBatchStatusMutation.mutateAsync({ batchId: completionBatch.id, status: "completed" });
+      if (orderId && orderStatus) {
+        await updateOrderStatusMutation.mutateAsync({ orderId, status: orderStatus });
+      }
     }
   };
 
@@ -405,6 +852,8 @@ export default function AdminBake() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
+          <RecipesSection />
+
           {inProgressBatches.length > 0 && (
             <Card className="border-orange-500/30">
               <CardHeader>
@@ -440,7 +889,7 @@ export default function AdminBake() {
                         </div>
                       </div>
                       <Button
-                        onClick={() => updateBatchStatusMutation.mutate({ batchId: batch.id, status: "completed" })}
+                        onClick={() => handleCompleteBatch(batch)}
                         disabled={updateBatchStatusMutation.isPending}
                         data-testid={`button-complete-${batch.id}`}
                       >
@@ -568,6 +1017,15 @@ export default function AdminBake() {
           onClose={() => setChecklistBatch(null)}
           onConfirmStart={confirmStartBatch}
           isPending={updateBatchStatusMutation.isPending}
+        />
+      )}
+
+      {completionBatch && (
+        <BatchCompletionDialog
+          batch={completionBatch}
+          onClose={() => setCompletionBatch(null)}
+          onComplete={confirmCompleteBatch}
+          isPending={updateBatchStatusMutation.isPending || updateOrderStatusMutation.isPending}
         />
       )}
 

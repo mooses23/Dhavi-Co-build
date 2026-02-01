@@ -356,3 +356,19 @@
 .modern-leaflet-map .leaflet-popup-close-button:hover {
   color: hsl(var(--foreground)) !important;
 }
+
+/* Ensure Leaflet map doesn't block dialogs */
+.modern-map-container {
+  position: relative;
+  z-index: 0;
+}
+
+.modern-leaflet-map .leaflet-pane,
+.modern-leaflet-map .leaflet-control-container {
+  z-index: 1 !important;
+}
+
+/* Fix for Leaflet controls not blocking content above */
+.leaflet-container {
+  z-index: 1 !important;
+}
