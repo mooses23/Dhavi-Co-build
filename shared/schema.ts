@@ -4,7 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Re-export auth models
-export * from "./models/auth.ts";
+export * from "./models/auth";
 
 // ============================================
 // INGREDIENTS - The truth layer
