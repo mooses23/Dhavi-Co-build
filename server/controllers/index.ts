@@ -8,4 +8,12 @@ export * from "./invoices.controller.js";
 export * from "./marketing.controller.js";
 export * from "./stats.controller.js";
 export * from "./freezer.controller.js";
+export { 
+  getFreezers, 
+  createFreezer, 
+  updateFreezer, 
+  deleteFreezer, 
+  addFreezerStock, 
+  updateFreezerStock as updateFreezerStockPerFreezer 
+} from "./freezers.controller.js";
 export * from "./activity.controller.js";

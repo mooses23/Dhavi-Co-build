@@ -15,6 +15,7 @@ import {
   invoiceItems,
   inventoryAdjustments,
   freezerStock,
+  freezers,
   activityLogs,
   type Ingredient,
   type InsertIngredient,
@@ -44,6 +45,8 @@ import {
   type InsertInventoryAdjustment,
   type FreezerStock,
   type InsertFreezerStock,
+  type Freezer,
+  type InsertFreezer,
   type ActivityLog,
   type InsertActivityLog,
 } from "../shared/schema.js";
@@ -86,6 +89,13 @@ export interface IStorage {
   getLocationInventory(locationId: string): Promise<(LocationInventory & { product: Product })[]>;
   updateLocationInventory(locationId: string, productId: string, delta: number): Promise<void>;
 
+  // Freezers
+  getFreezers(): Promise<(Freezer & { stock: (FreezerStock & { product: Product })[] })[]>;
+  getFreezer(id: string): Promise<(Freezer & { stock: (FreezerStock & { product: Product })[] }) | undefined>;
+  createFreezer(data: InsertFreezer): Promise<Freezer>;
+  updateFreezer(id: string, data: Partial<InsertFreezer>): Promise<Freezer | undefined>;
+  deleteFreezer(id: string): Promise<void>;
+
   // Orders
   getOrders(): Promise<(Order & { location?: Location; items: (OrderItem & { product: Product })[] })[]>;
   getOrder(id: string): Promise<(Order & { location?: Location; items: (OrderItem & { product: Product })[] }) | undefined>;
@@ -115,8 +125,10 @@ export interface IStorage {
   // Freezer Stock
   getFreezerStock(): Promise<(FreezerStock & { product: Product })[]>;
   getFreezerStockByProduct(productId: string): Promise<FreezerStock[]>;
+  getFreezerStockByFreezerAndProduct(freezerId: string, productId: string): Promise<FreezerStock | undefined>;
   createFreezerStock(data: InsertFreezerStock): Promise<FreezerStock>;
   updateFreezerStock(id: string, quantity: number): Promise<FreezerStock | undefined>;
+  addOrUpdateFreezerStock(freezerId: string, productId: string, quantity: number): Promise<FreezerStock>;
   addToFreezerFromBatch(batchId: string, items: { productId: string; quantity: number }[]): Promise<void>;
 
   // Activity Logs
@@ -330,6 +342,77 @@ export class DatabaseStorage implements IStorage {
         quantity: delta,
       });
     }
+  }
+
+  // Freezers
+  async getFreezers(): Promise<(Freezer & { stock: (FreezerStock & { product: Product })[] })[]> {
+    const allFreezers = await db.select().from(freezers).orderBy(freezers.name);
+    
+    const result = [];
+    for (const freezer of allFreezers) {
+      const stock = await db
+        .select()
+        .from(freezerStock)
+        .innerJoin(products, eq(freezerStock.productId, products.id))
+        .where(eq(freezerStock.freezerId, freezer.id));
+      
+      result.push({
+        ...freezer,
+        stock: stock.map((row) => ({
+          ...row.freezer_stock,
+          product: row.products,
+        })),
+      });
+    }
+    
+    return result;
+  }
+
+  async getFreezer(id: string): Promise<(Freezer & { stock: (FreezerStock & { product: Product })[] }) | undefined> {
+    const [freezer] = await db.select().from(freezers).where(eq(freezers.id, id));
+    if (!freezer) return undefined;
+
+    const stock = await db
+      .select()
+      .from(freezerStock)
+      .innerJoin(products, eq(freezerStock.productId, products.id))
+      .where(eq(freezerStock.freezerId, id));
+    
+    return {
+      ...freezer,
+      stock: stock.map((row) => ({
+        ...row.freezer_stock,
+        product: row.products,
+      })),
+    };
+  }
+
+  async createFreezer(data: InsertFreezer): Promise<Freezer> {
+    const [freezer] = await db.insert(freezers).values(data).returning();
+    return freezer;
+  }
+
+  async updateFreezer(id: string, data: Partial<InsertFreezer>): Promise<Freezer | undefined> {
+    const [freezer] = await db
+      .update(freezers)
+      .set(data)
+      .where(eq(freezers.id, id))
+      .returning();
+    return freezer;
+  }
+
+  async deleteFreezer(id: string): Promise<void> {
+    // Check if freezer has any stock
+    const [stock] = await db
+      .select()
+      .from(freezerStock)
+      .where(eq(freezerStock.freezerId, id));
+
+    if (stock) {
+      throw new Error("Cannot delete freezer with stock");
+    }
+
+    await db.delete(freezers).where(eq(freezers.id, id));
   }
 
   // Orders
@@ -568,6 +651,17 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(freezerStock).where(eq(freezerStock.productId, productId));
   }
 
+  async getFreezerStockByFreezerAndProduct(freezerId: string, productId: string): Promise<FreezerStock | undefined> {
+    const [stock] = await db
+      .select()
+      .from(freezerStock)
+      .where(and(
+        eq(freezerStock.freezerId, freezerId),
+        eq(freezerStock.productId, productId)
+      ));
+    return stock;
+  }
+
   async createFreezerStock(data: InsertFreezerStock): Promise<FreezerStock> {
     const [stock] = await db.insert(freezerStock).values(data).returning();
     return stock;
@@ -580,6 +674,29 @@ export class DatabaseStorage implements IStorage {
       .where(eq(freezerStock.id, id))
       .returning();
     return stock;
+  }
+
+  async addOrUpdateFreezerStock(freezerId: string, productId: string, quantity: number): Promise<FreezerStock> {
+    const existing = await this.getFreezerStockByFreezerAndProduct(freezerId, productId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(freezerStock)
+        .set({ quantity, updatedAt: new Date() })
+        .where(eq(freezerStock.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(freezerStock)
+        .values({
+          freezerId,
+          productId,
+          quantity,
+        })
+        .returning();
+      return created;
+    }
   }
 
   async addToFreezerFromBatch(batchId: string, items: { productId: string; quantity: number }[]): Promise<void> {
