@@ -4,7 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Re-export auth models
-export * from "./models/auth.js";
+export * from "./models/auth.ts";
 
 // ============================================
 // INGREDIENTS - The truth layer
@@ -394,6 +394,7 @@ export type InventoryAdjustment = typeof inventoryAdjustments.$inferSelect;
 export const freezerStock = pgTable("freezer_stock", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   productId: varchar("product_id").notNull().references(() => products.id),
+  freezerId: varchar("freezer_id").references(() => freezers.id),
   quantity: integer("quantity").notNull().default(0),
   batchId: varchar("batch_id").references(() => batches.id),
   frozenAt: timestamp("frozen_at").defaultNow(),
@@ -411,6 +412,10 @@ export const freezerStockRelations = relations(freezerStock, ({ one }) => ({
     fields: [freezerStock.productId],
     references: [products.id],
   }),
+  freezer: one(freezers, {
+    fields: [freezerStock.freezerId],
+    references: [freezers.id],
+  }),
   batch: one(batches, {
     fields: [freezerStock.batchId],
     references: [batches.id],
@@ -425,6 +430,27 @@ export const insertFreezerStockSchema = createInsertSchema(freezerStock).omit({
 
 export type InsertFreezerStock = z.infer<typeof insertFreezerStockSchema>;
 export type FreezerStock = typeof freezerStock.$inferSelect;
+
+// ============================================
+// FREEZERS - Physical freezer units
+// ============================================
+export const freezers = pgTable("freezers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const freezersRelations = relations(freezers, ({ many }) => ({
+  stock: many(freezerStock),
+}));
+
+export const insertFreezerSchema = createInsertSchema(freezers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertFreezer = z.infer<typeof insertFreezerSchema>;
+export type Freezer = typeof freezers.$inferSelect;
 
 // ============================================
 // ACTIVITY LOGS - Audit trail for all actions
