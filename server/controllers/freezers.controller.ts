@@ -124,3 +124,56 @@ export async function updateFreezerStock(req: Request, res: Response) {
     res.status(500).json({ message: "Failed to update freezer stock" });
   }
 }
+
+export async function updateFreezerStockPerFreezer(req: Request, res: Response) {
+  try {
+    const quantitySchema = z.object({
+      quantity: z.number().min(0),
+    });
+    
+    const parseResult = quantitySchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        message: "Invalid quantity data",
+        errors: parseResult.error.errors 
+      });
+    }
+    
+    const { quantity } = parseResult.data;
+    const freezerId = req.params.freezerId as string;
+    const productId = req.params.productId as string;
+    
+    const stock = await storage.addOrUpdateFreezerStock(freezerId, productId, quantity);
+    res.json(stock);
+  } catch (error) {
+    console.error("Error updating freezer stock:", error);
+    res.status(500).json({ message: "Failed to update freezer stock" });
+  }
+}
+
+export async function seedFreezers(req: Request, res: Response) {
+  try {
+    const existingFreezers = await storage.getFreezers();
+    if (existingFreezers.length > 0) {
+      return res.status(400).json({ 
+        message: "Freezers already exist. Seed only works when no freezers exist." 
+      });
+    }
+
+    const freezerNames = ["Freezer 1", "Freezer 2", "Freezer 3"];
+    const createdFreezers = [];
+    
+    for (const name of freezerNames) {
+      const freezer = await storage.createFreezer({ name });
+      createdFreezers.push(freezer);
+    }
+
+    res.json({ 
+      message: `Created ${createdFreezers.length} freezers`,
+      freezers: createdFreezers 
+    });
+  } catch (error) {
+    console.error("Error seeding freezers:", error);
+    res.status(500).json({ message: "Failed to seed freezers" });
+  }
+}

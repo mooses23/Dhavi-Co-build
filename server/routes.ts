@@ -54,6 +54,7 @@ import {
   deleteFreezer,
   addFreezerStock,
   updateFreezerStockPerFreezer,
+  seedFreezers,
   getActivityLogs,
   getRecentActivity,
 } from "./controllers/index.js";
@@ -165,6 +166,7 @@ export async function registerRoutes(
   app.delete("/api/admin/freezers/:id", isSimpleAuthenticated, deleteFreezer);
   app.post("/api/admin/freezers/:freezerId/stock", isSimpleAuthenticated, addFreezerStock);
   app.patch("/api/admin/freezers/:freezerId/stock/:productId", isSimpleAuthenticated, updateFreezerStockPerFreezer);
+  app.post("/api/admin/freezers/seed", isSimpleAuthenticated, seedFreezers);
 
   // Activity Logs
   app.get("/api/admin/activity", isSimpleAuthenticated, getActivityLogs);

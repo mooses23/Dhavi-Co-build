@@ -14,6 +14,7 @@ export {
   updateFreezer, 
   deleteFreezer, 
   addFreezerStock, 
-  updateFreezerStock as updateFreezerStockPerFreezer 
+  updateFreezerStockPerFreezer,
+  seedFreezers,
 } from "./freezers.controller.js";
 export * from "./activity.controller.js";
