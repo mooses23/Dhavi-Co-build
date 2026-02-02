@@ -1,324 +1,83 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { format } from "date-fns";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Timer, Plus, CalendarIcon, Play, CheckCircle, Pause, RotateCcw, ChefHat, ClipboardList, ChevronDown, ChevronRight, BookOpen, Pencil, Save, X, Snowflake, Package } from "lucide-react";
-import type { Batch, Product, Ingredient, BillOfMaterial, Order } from "@shared/schema";
+import { 
+  Timer, Play, Pause, RotateCcw, CheckCircle, ChefHat, 
+  Snowflake, Package, Flame, Clock, StickyNote,
+  ThermometerSun, Volume2
+} from "lucide-react";
+import { format } from "date-fns";
+import type { Product, Ingredient, BillOfMaterial, Order } from "@shared/schema";
+import ovenHeroImage from "../../assets/images/oven-hero.jpg";
+import bagelTileImage from "../../assets/images/bagel-tile.jpg";
 
-const batchFormSchema = z.object({
-  batchDate: z.date({ required_error: "Batch date is required" }),
-  shift: z.string().min(1, "Shift is required"),
-  notes: z.string().optional(),
-  items: z.array(z.object({
-    productId: z.string(),
-    quantity: z.number().min(0),
-  })),
-});
-
-type BatchFormData = z.infer<typeof batchFormSchema>;
-
-const statusColors: Record<string, string> = {
-  planned: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  in_progress: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-  completed: "bg-green-500/10 text-green-600 border-green-500/20",
-  cancelled: "bg-destructive/10 text-destructive border-destructive/20",
-};
-
-const TIMER_PRESETS = [
-  { label: "15 min", seconds: 15 * 60 },
-  { label: "20 min", seconds: 20 * 60 },
-  { label: "25 min", seconds: 25 * 60 },
-  { label: "30 min", seconds: 30 * 60 },
+const BAKE_STEPS = [
+  { id: "gather", name: "Gather Ingredients", hasTimer: false, hint: "Check all ingredients are available and fresh" },
+  { id: "prep", name: "Prep", hasTimer: false, hint: "Measure and prepare all ingredients" },
+  { id: "dough", name: "Make Dough", hasTimer: false, hint: "Mix until smooth and elastic" },
+  { id: "rise", name: "Rise Dough", hasTimer: true, defaultMinutes: 90, hint: "Cover and let rise until doubled" },
+  { id: "shape", name: "Shape", hasTimer: false, hint: "Form bagel rings, uniform size" },
+  { id: "boil", name: "Boil", hasTimer: true, defaultMinutes: 2, hint: "Water at 212°F - 1 min each side" },
+  { id: "toppings", name: "Apply Toppings", hasTimer: false, hint: "Seeds, everything mix, etc." },
+  { id: "bake", name: "Bake", hasTimer: true, defaultMinutes: 20, hint: "Oven at 450°F until golden" },
+  { id: "cool", name: "Cool", hasTimer: true, defaultMinutes: 15, hint: "Rest on rack before storing" },
+  { id: "cleaning", name: "Cleaning", hasTimer: false, hint: "Clean equipment and workspace" },
 ];
 
-function BakingTimer() {
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    
-    if (isRunning && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            setIsRunning(false);
-            toast({
-              title: "Timer Complete",
-              description: "Your baking timer has finished!",
-            });
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isRunning, timeLeft, toast]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const selectPreset = (seconds: number, index: number) => {
-    setTimeLeft(seconds);
-    setSelectedPreset(index);
-    setIsRunning(false);
-  };
-
-  const toggleTimer = () => {
-    if (timeLeft > 0) {
-      setIsRunning(!isRunning);
-    }
-  };
-
-  const resetTimer = () => {
-    setIsRunning(false);
-    setTimeLeft(0);
-    setSelectedPreset(null);
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Timer className="h-5 w-5" />
-          Baking Timer
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {TIMER_PRESETS.map((preset, index) => (
-            <Button
-              key={preset.label}
-              variant={selectedPreset === index ? "default" : "outline"}
-              size="sm"
-              onClick={() => selectPreset(preset.seconds, index)}
-              data-testid={`button-timer-preset-${preset.seconds}`}
-            >
-              {preset.label}
-            </Button>
-          ))}
-        </div>
-        
-        <div className="flex items-center justify-center py-6">
-          <div className="text-5xl font-mono font-bold tabular-nums" data-testid="timer-display">
-            {formatTime(timeLeft)}
-          </div>
-        </div>
-
-        <div className="flex justify-center gap-2">
-          <Button
-            onClick={toggleTimer}
-            disabled={timeLeft === 0}
-            data-testid="button-timer-toggle"
-          >
-            {isRunning ? (
-              <>
-                <Pause className="h-4 w-4 mr-2" />
-                Pause
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4 mr-2" />
-                Start
-              </>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={resetTimer}
-            disabled={timeLeft === 0 && !isRunning}
-            data-testid="button-timer-reset"
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Reset
-          </Button>
-        </div>
-
-        {isRunning && (
-          <div className="text-center text-sm text-muted-foreground">
-            Timer is running...
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+interface BakeSession {
+  productId: string;
+  productName: string;
+  quantity: number;
+  startedAt: Date;
+  completedSteps: string[];
+  stepNotes: Record<string, string>;
+  stepTimers: Record<string, { running: boolean; timeLeft: number; totalTime: number }>;
 }
 
-interface IngredientChecklistProps {
-  batch: Batch & { items: any[] };
-  onClose: () => void;
-  onConfirmStart: () => void;
-  isPending: boolean;
-}
+const STORAGE_KEY = "dhavi-bake-session";
 
-function IngredientChecklist({ batch, onClose, onConfirmStart, isPending }: IngredientChecklistProps) {
-  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
-  const [aggregatedIngredients, setAggregatedIngredients] = useState<
-    Array<{ ingredientId: string; name: string; quantity: number; unit: string }>
-  >([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchIngredients() {
-      setIsLoading(true);
-      const ingredientMap: Record<string, { name: string; quantity: number; unit: string }> = {};
-
-      for (const item of batch.items || []) {
-        if (item.quantity > 0 && item.productId) {
-          try {
-            const response = await fetch(`/api/admin/products/${item.productId}/bom`, {
-              credentials: "include",
-            });
-            if (response.ok) {
-              const bom: (BillOfMaterial & { ingredient: Ingredient })[] = await response.json();
-              for (const bomItem of bom) {
-                const qty = parseFloat(bomItem.quantity) * item.quantity;
-                if (ingredientMap[bomItem.ingredientId]) {
-                  ingredientMap[bomItem.ingredientId].quantity += qty;
-                } else {
-                  ingredientMap[bomItem.ingredientId] = {
-                    name: bomItem.ingredient.name,
-                    quantity: qty,
-                    unit: bomItem.ingredient.unit,
-                  };
-                }
-              }
-            }
-          } catch (error) {
-            console.error("Failed to fetch BOM for product:", item.productId);
-          }
-        }
-      }
-
-      const ingredients = Object.entries(ingredientMap).map(([ingredientId, data]) => ({
-        ingredientId,
-        ...data,
-      }));
-      setAggregatedIngredients(ingredients);
-      setIsLoading(false);
+function loadSession(): BakeSession | null {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      parsed.startedAt = new Date(parsed.startedAt);
+      return parsed;
     }
-
-    fetchIngredients();
-  }, [batch.items]);
-
-  const toggleItem = (ingredientId: string) => {
-    setCheckedItems((prev) => ({
-      ...prev,
-      [ingredientId]: !prev[ingredientId],
-    }));
-  };
-
-  const allChecked = aggregatedIngredients.length > 0 && 
-    aggregatedIngredients.every((item) => checkedItems[item.ingredientId]);
-
-  return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 font-serif">
-            <ClipboardList className="h-5 w-5" />
-            Ingredient Checklist
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="py-4">
-          <p className="text-sm text-muted-foreground mb-4">
-            Verify all ingredients are ready before starting the batch:
-          </p>
-
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : aggregatedIngredients.length === 0 ? (
-            <p className="text-center py-6 text-muted-foreground">
-              No ingredients required for this batch.
-            </p>
-          ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {aggregatedIngredients.map((item) => (
-                <div
-                  key={item.ingredientId}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-border hover-elevate cursor-pointer"
-                  onClick={() => toggleItem(item.ingredientId)}
-                  data-testid={`ingredient-check-${item.ingredientId}`}
-                >
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={checkedItems[item.ingredientId] || false}
-                      onCheckedChange={() => toggleItem(item.ingredientId)}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <span className={checkedItems[item.ingredientId] ? "line-through text-muted-foreground" : ""}>
-                      {item.name}
-                    </span>
-                  </div>
-                  <Badge variant="secondary">
-                    {item.quantity.toFixed(2)} {item.unit}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={onConfirmStart}
-            disabled={isPending || (!allChecked && aggregatedIngredients.length > 0)}
-            data-testid="button-confirm-start-batch"
-          >
-            {isPending ? "Starting..." : "Start Batch"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  } catch (e) {
+    console.error("Failed to load session", e);
+  }
+  return null;
 }
 
-interface RecipeCardProps {
+function saveSession(session: BakeSession | null) {
+  if (session) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  } else {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+}
+
+interface FlippableTileProps {
   product: Product;
   ingredients: Ingredient[];
+  onDragStart: (product: Product) => void;
 }
 
-function RecipeCard({ product, ingredients }: RecipeCardProps) {
-  const { toast } = useToast();
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedBom, setEditedBom] = useState<Array<{ ingredientId: string; quantity: number }>>([]);
+function FlippableTile({ product, ingredients, onDragStart }: FlippableTileProps) {
+  const [isFlipped, setIsFlipped] = useState(false);
   
-  const { data: bom, isLoading } = useQuery<(BillOfMaterial & { ingredient: Ingredient })[]>({
+  const { data: bom } = useQuery<(BillOfMaterial & { ingredient: Ingredient })[]>({
     queryKey: ["/api/admin/products", product.id, "bom"],
     queryFn: async () => {
       const response = await fetch(`/api/admin/products/${product.id}/bom`, {
@@ -329,256 +88,460 @@ function RecipeCard({ product, ingredients }: RecipeCardProps) {
     },
   });
 
-  const updateBomMutation = useMutation({
-    mutationFn: async (items: Array<{ ingredientId: string; quantity: number }>) => {
-      return await apiRequest("PUT", `/api/admin/products/${product.id}/bom`, { items });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/products", product.id, "bom"] });
-      toast({ title: "Recipe Updated", description: `${product.name} ingredients have been saved` });
-      setIsEditing(false);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const startEditing = () => {
-    setEditedBom(
-      bom?.map((item) => ({
-        ingredientId: item.ingredientId,
-        quantity: parseFloat(item.quantity),
-      })) || []
-    );
-    setIsEditing(true);
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("product", JSON.stringify(product));
+    onDragStart(product);
   };
-
-  const cancelEditing = () => {
-    setIsEditing(false);
-    setEditedBom([]);
-  };
-
-  const saveChanges = () => {
-    updateBomMutation.mutate(editedBom.filter((item) => item.quantity > 0));
-  };
-
-  const updateIngredientQuantity = (ingredientId: string, quantity: number) => {
-    setEditedBom((prev) => {
-      const existing = prev.find((item) => item.ingredientId === ingredientId);
-      if (existing) {
-        return prev.map((item) =>
-          item.ingredientId === ingredientId ? { ...item, quantity } : item
-        );
-      }
-      return [...prev, { ingredientId, quantity }];
-    });
-  };
-
-  const addIngredient = (ingredientId: string) => {
-    if (!editedBom.find((item) => item.ingredientId === ingredientId)) {
-      setEditedBom((prev) => [...prev, { ingredientId, quantity: 0 }]);
-    }
-  };
-
-  const removeIngredient = (ingredientId: string) => {
-    setEditedBom((prev) => prev.filter((item) => item.ingredientId !== ingredientId));
-  };
-
-  const getIngredientName = (ingredientId: string) => {
-    return ingredients.find((i) => i.id === ingredientId)?.name || "Unknown";
-  };
-
-  const getIngredientUnit = (ingredientId: string) => {
-    return ingredients.find((i) => i.id === ingredientId)?.unit || "";
-  };
-
-  const availableIngredients = ingredients.filter(
-    (ing) => !editedBom.find((item) => item.ingredientId === ing.id)
-  );
 
   return (
-    <div className="p-4 rounded-lg border border-border" data-testid={`recipe-card-${product.id}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="font-semibold">{product.name}</h4>
-        {!isEditing ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={startEditing}
-            data-testid={`button-edit-recipe-${product.id}`}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-        ) : (
-          <div className="flex gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={cancelEditing}
-              data-testid={`button-cancel-recipe-${product.id}`}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="default"
-              onClick={saveChanges}
-              disabled={updateBomMutation.isPending}
-              data-testid={`button-save-recipe-${product.id}`}
-            >
-              <Save className="h-4 w-4" />
-            </Button>
+    <div
+      className="relative w-full aspect-square cursor-grab active:cursor-grabbing perspective-1000"
+      style={{ perspective: "1000px" }}
+      onClick={() => setIsFlipped(!isFlipped)}
+      draggable
+      onDragStart={handleDragStart}
+      data-testid={`tile-${product.id}`}
+    >
+      <div
+        className={`relative w-full h-full transition-transform duration-500 preserve-3d ${isFlipped ? "rotate-y-180" : ""}`}
+        style={{
+          transformStyle: "preserve-3d",
+          transform: isFlipped ? "rotateY(180deg)" : "rotateY(0)",
+        }}
+      >
+        <div
+          className="absolute inset-0 rounded-xl overflow-hidden border-2 border-border shadow-lg backface-hidden"
+          style={{ backfaceVisibility: "hidden" }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10" />
+          <img
+            src={product.imageUrl || bagelTileImage}
+            alt={product.name}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
+            <h3 className="text-white font-serif text-xl font-bold">{product.name}</h3>
+            <p className="text-white/80 text-sm mt-1">Tap to see recipe</p>
           </div>
-        )}
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
         </div>
-      ) : isEditing ? (
-        <div className="space-y-2">
-          {editedBom.map((item) => (
-            <div
-              key={item.ingredientId}
-              className="flex items-center gap-2"
-              data-testid={`recipe-ingredient-edit-${item.ingredientId}`}
-            >
-              <span className="flex-1 text-sm">{getIngredientName(item.ingredientId)}</span>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                className="w-20"
-                value={item.quantity}
-                onChange={(e) =>
-                  updateIngredientQuantity(item.ingredientId, parseFloat(e.target.value) || 0)
-                }
-                data-testid={`input-recipe-qty-${item.ingredientId}`}
-              />
-              <span className="text-sm text-muted-foreground w-12">
-                {getIngredientUnit(item.ingredientId)}
-              </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => removeIngredient(item.ingredientId)}
-                data-testid={`button-remove-ingredient-${item.ingredientId}`}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+        
+        <div
+          className="absolute inset-0 rounded-xl bg-card border-2 border-border shadow-lg p-4 overflow-auto backface-hidden"
+          style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
+        >
+          <h3 className="font-serif text-lg font-bold mb-3">{product.name} Recipe</h3>
+          {bom && bom.length > 0 ? (
+            <div className="space-y-2">
+              {bom.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between text-sm py-1 border-b border-border/50 last:border-0"
+                >
+                  <span>{item.ingredient.name}</span>
+                  <Badge variant="secondary" className="text-xs">
+                    {parseFloat(item.quantity).toFixed(2)} {item.ingredient.unit}
+                  </Badge>
+                </div>
+              ))}
             </div>
-          ))}
-          {availableIngredients.length > 0 && (
-            <div className="pt-2">
-              <Select onValueChange={addIngredient}>
-                <SelectTrigger data-testid={`select-add-ingredient-${product.id}`}>
-                  <SelectValue placeholder="Add ingredient..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableIngredients.map((ing) => (
-                    <SelectItem key={ing.id} value={ing.id}>
-                      {ing.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm">No ingredients defined</p>
           )}
+          <p className="text-muted-foreground text-xs mt-4">Tap to flip back</p>
         </div>
-      ) : bom && bom.length > 0 ? (
-        <div className="space-y-1">
-          {bom.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center justify-between text-sm"
-              data-testid={`recipe-ingredient-${item.ingredientId}`}
-            >
-              <span>{item.ingredient.name}</span>
-              <Badge variant="secondary">
-                {parseFloat(item.quantity).toFixed(2)} {item.ingredient.unit}
-              </Badge>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">No ingredients defined</p>
-      )}
+      </div>
     </div>
   );
 }
 
-function RecipesSection() {
-  const [isOpen, setIsOpen] = useState(false);
+interface OvenWidgetProps {
+  onDrop: (product: Product) => void;
+  isDragging: boolean;
+}
 
-  const { data: products } = useQuery<Product[]>({
-    queryKey: ["/api/admin/products"],
-  });
+function OvenWidget({ onDrop, isDragging }: OvenWidgetProps) {
+  const [isOver, setIsOver] = useState(false);
 
-  const { data: ingredients } = useQuery<Ingredient[]>({
-    queryKey: ["/api/admin/ingredients"],
-  });
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsOver(true);
+  };
 
-  const bagelProducts = products?.filter((p) => p.isActive) || [];
+  const handleDragLeave = () => {
+    setIsOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsOver(false);
+    try {
+      const product = JSON.parse(e.dataTransfer.getData("product"));
+      onDrop(product);
+    } catch (err) {
+      console.error("Failed to parse dropped product", err);
+    }
+  };
 
   return (
-    <Card data-testid="recipes-section">
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader className="cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
-          <CollapsibleTrigger asChild>
-            <CardTitle className="flex items-center gap-2">
-              {isOpen ? (
-                <ChevronDown className="h-5 w-5" />
-              ) : (
-                <ChevronRight className="h-5 w-5" />
-              )}
-              <BookOpen className="h-5 w-5" />
-              Recipes
-            </CardTitle>
-          </CollapsibleTrigger>
-        </CardHeader>
-        <CollapsibleContent>
-          <CardContent className="space-y-4">
-            {!products || !ingredients ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-24 w-full" />
-                ))}
+    <div
+      className={`relative w-full h-48 md:h-64 rounded-xl overflow-hidden border-2 transition-all duration-300 ${
+        isOver
+          ? "border-primary shadow-lg shadow-primary/20 scale-[1.02]"
+          : isDragging
+          ? "border-primary/50 border-dashed"
+          : "border-border"
+      }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      data-testid="oven-widget"
+    >
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20 z-10" />
+      <img
+        src={ovenHeroImage}
+        alt="Bakery oven"
+        className="w-full h-full object-cover"
+      />
+      <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
+        <Flame className={`h-12 w-12 mb-3 transition-all ${isOver ? "text-orange-400 scale-110" : "text-white/80"}`} />
+        <h2 className="text-white font-serif text-2xl md:text-3xl font-bold text-center">
+          {isOver ? "Drop to Start!" : "Start Bake"}
+        </h2>
+        <p className="text-white/70 text-sm mt-2">
+          {isDragging ? "Drop bagel here to begin" : "Drag a bagel tile here"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+interface StepTimerProps {
+  stepId: string;
+  timeLeft: number;
+  totalTime: number;
+  isRunning: boolean;
+  onStart: () => void;
+  onPause: () => void;
+  onReset: () => void;
+}
+
+function StepTimer({ stepId, timeLeft, totalTime, isRunning, onStart, onPause, onReset }: StepTimerProps) {
+  const progress = totalTime > 0 ? ((totalTime - timeLeft) / totalTime) * 100 : 0;
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+
+  return (
+    <div className="flex items-center gap-3 bg-muted/50 rounded-full px-4 py-2" data-testid={`timer-${stepId}`}>
+      <div className="relative w-12 h-12">
+        <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+          <circle
+            cx="18"
+            cy="18"
+            r="15"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            className="text-muted"
+          />
+          <circle
+            cx="18"
+            cy="18"
+            r="15"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeDasharray={`${progress} 100`}
+            className={isRunning ? "text-orange-500" : "text-primary"}
+          />
+        </svg>
+        <Clock className="absolute inset-0 m-auto w-5 h-5 text-muted-foreground" />
+      </div>
+      <div className="font-mono text-lg font-bold tabular-nums min-w-[60px]">
+        {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+      </div>
+      <div className="flex gap-1">
+        {isRunning ? (
+          <Button size="icon" variant="ghost" onClick={onPause} data-testid={`button-pause-${stepId}`}>
+            <Pause className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button size="icon" variant="ghost" onClick={onStart} disabled={timeLeft === 0} data-testid={`button-start-${stepId}`}>
+            <Play className="h-4 w-4" />
+          </Button>
+        )}
+        <Button size="icon" variant="ghost" onClick={onReset} data-testid={`button-reset-${stepId}`}>
+          <RotateCcw className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+interface BakeChecklistProps {
+  session: BakeSession;
+  onUpdateSession: (session: BakeSession) => void;
+  onComplete: () => void;
+  scaledIngredients: Array<{ name: string; quantity: number; unit: string }>;
+}
+
+function BakeChecklist({ session, onUpdateSession, onComplete, scaledIngredients }: BakeChecklistProps) {
+  const { toast } = useToast();
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
+
+  const playBeep = () => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = audioContextRef.current;
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      oscillator.frequency.value = 800;
+      oscillator.type = "sine";
+      gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+      
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + 0.5);
+    } catch (e) {
+      console.log("Audio play failed:", e);
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      let updated = false;
+      const newTimers = { ...session.stepTimers };
+      
+      for (const stepId of Object.keys(newTimers)) {
+        const timer = newTimers[stepId];
+        if (timer.running && timer.timeLeft > 0) {
+          timer.timeLeft -= 1;
+          updated = true;
+          
+          if (timer.timeLeft === 0) {
+            timer.running = false;
+            toast({
+              title: "Timer Complete!",
+              description: `${BAKE_STEPS.find(s => s.id === stepId)?.name} timer finished`,
+            });
+            playBeep();
+          }
+        }
+      }
+      
+      if (updated) {
+        onUpdateSession({ ...session, stepTimers: newTimers });
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [session, onUpdateSession, toast]);
+
+  const toggleStep = (stepId: string) => {
+    const completed = session.completedSteps.includes(stepId);
+    const newCompleted = completed
+      ? session.completedSteps.filter(s => s !== stepId)
+      : [...session.completedSteps, stepId];
+    onUpdateSession({ ...session, completedSteps: newCompleted });
+  };
+
+  const updateNote = (stepId: string, note: string) => {
+    onUpdateSession({
+      ...session,
+      stepNotes: { ...session.stepNotes, [stepId]: note },
+    });
+  };
+
+  const startTimer = (stepId: string) => {
+    const newTimers = { ...session.stepTimers };
+    if (newTimers[stepId]) {
+      newTimers[stepId].running = true;
+    }
+    onUpdateSession({ ...session, stepTimers: newTimers });
+  };
+
+  const pauseTimer = (stepId: string) => {
+    const newTimers = { ...session.stepTimers };
+    if (newTimers[stepId]) {
+      newTimers[stepId].running = false;
+    }
+    onUpdateSession({ ...session, stepTimers: newTimers });
+  };
+
+  const resetTimer = (stepId: string) => {
+    const step = BAKE_STEPS.find(s => s.id === stepId);
+    const newTimers = { ...session.stepTimers };
+    if (newTimers[stepId] && step?.defaultMinutes) {
+      newTimers[stepId] = {
+        running: false,
+        timeLeft: step.defaultMinutes * 60,
+        totalTime: step.defaultMinutes * 60,
+      };
+    }
+    onUpdateSession({ ...session, stepTimers: newTimers });
+  };
+
+  const completedCount = session.completedSteps.length;
+  const progressPercent = (completedCount / BAKE_STEPS.length) * 100;
+  const allComplete = completedCount === BAKE_STEPS.length;
+
+  return (
+    <Card className="border-orange-500/30" data-testid="bake-checklist">
+      <CardContent className="p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 className="font-serif text-2xl font-bold flex items-center gap-2">
+              <ChefHat className="h-6 w-6" />
+              {session.productName}
+            </h2>
+            <div className="flex items-center gap-3 mt-1 text-muted-foreground">
+              <Badge variant="secondary">{session.quantity} bagels</Badge>
+              <span className="text-sm">Started {format(session.startedAt, "h:mm a")}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-sm text-muted-foreground">Progress</div>
+              <div className="font-bold">{completedCount}/{BAKE_STEPS.length}</div>
+            </div>
+            <div className="w-24">
+              <Progress value={progressPercent} className="h-3" />
+            </div>
+          </div>
+        </div>
+
+        {session.completedSteps.length === 0 && scaledIngredients.length > 0 && (
+          <div className="mb-6 p-4 rounded-lg bg-muted/50 border border-border">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <ThermometerSun className="h-4 w-4" />
+              Scaled Ingredients for {session.quantity} bagels
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {scaledIngredients.map((ing, i) => (
+                <div key={i} className="flex justify-between text-sm py-1">
+                  <span>{ing.name}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {ing.quantity.toFixed(2)} {ing.unit}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {BAKE_STEPS.map((step) => {
+            const isComplete = session.completedSteps.includes(step.id);
+            const timer = session.stepTimers[step.id];
+            const note = session.stepNotes[step.id] || "";
+            const showNotes = expandedNotes === step.id;
+
+            return (
+              <div
+                key={step.id}
+                className={`p-4 rounded-lg border transition-all ${
+                  isComplete
+                    ? "bg-green-500/10 border-green-500/30"
+                    : "bg-card border-border hover-elevate"
+                }`}
+                data-testid={`step-${step.id}`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div
+                    className="flex items-center gap-3 flex-1 cursor-pointer min-h-[44px]"
+                    onClick={() => toggleStep(step.id)}
+                  >
+                    <div className="flex items-center justify-center w-8 h-8">
+                      <Checkbox
+                        checked={isComplete}
+                        onCheckedChange={() => toggleStep(step.id)}
+                        className="h-6 w-6"
+                        data-testid={`checkbox-${step.id}`}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <span className={`font-medium text-lg ${isComplete ? "line-through text-muted-foreground" : ""}`}>
+                        {step.name}
+                      </span>
+                      <p className="text-sm text-muted-foreground">{step.hint}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 ml-11 sm:ml-0">
+                    {step.hasTimer && timer && (
+                      <StepTimer
+                        stepId={step.id}
+                        timeLeft={timer.timeLeft}
+                        totalTime={timer.totalTime}
+                        isRunning={timer.running}
+                        onStart={() => startTimer(step.id)}
+                        onPause={() => pauseTimer(step.id)}
+                        onReset={() => resetTimer(step.id)}
+                      />
+                    )}
+                    <Button
+                      size="icon"
+                      variant={note ? "secondary" : "ghost"}
+                      onClick={() => setExpandedNotes(showNotes ? null : step.id)}
+                      data-testid={`button-notes-${step.id}`}
+                    >
+                      <StickyNote className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {showNotes && (
+                  <div className="mt-3 ml-11">
+                    <Textarea
+                      placeholder="Add notes for this step..."
+                      value={note}
+                      onChange={(e) => updateNote(step.id, e.target.value)}
+                      className="min-h-[60px]"
+                      data-testid={`notes-${step.id}`}
+                    />
+                  </div>
+                )}
               </div>
-            ) : bagelProducts.length === 0 ? (
-              <p className="text-center py-6 text-muted-foreground">
-                No active products found.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {bagelProducts.map((product) => (
-                  <RecipeCard
-                    key={product.id}
-                    product={product}
-                    ingredients={ingredients}
-                  />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </CollapsibleContent>
-      </Collapsible>
+            );
+          })}
+        </div>
+
+        {allComplete && (
+          <div className="mt-6">
+            <Button
+              size="lg"
+              className="w-full"
+              onClick={onComplete}
+              data-testid="button-finish-bake"
+            >
+              <CheckCircle className="h-5 w-5 mr-2" />
+              Finish Bake
+            </Button>
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }
 
-interface BatchCompletionDialogProps {
-  batch: Batch & { items: any[] };
+interface CompletionDialogProps {
+  session: BakeSession;
   onClose: () => void;
-  onComplete: (orderId?: string, orderStatus?: string) => void;
+  onComplete: (destination: "freezer" | "order" | "split", orderId?: string, freezerQty?: number, orderQty?: number) => void;
   isPending: boolean;
 }
 
-function BatchCompletionDialog({ batch, onClose, onComplete, isPending }: BatchCompletionDialogProps) {
-  const [completionMode, setCompletionMode] = useState<"freezer" | "order">("freezer");
-  const [freezerQuantities, setFreezerQuantities] = useState<Record<string, number>>({});
-  const [selectedOrderId, setSelectedOrderId] = useState<string>("");
+function CompletionDialog({ session, onClose, onComplete, isPending }: CompletionDialogProps) {
+  const [destination, setDestination] = useState<"freezer" | "order" | "split">("freezer");
+  const [freezerQty, setFreezerQty] = useState(session.quantity);
+  const [orderQty, setOrderQty] = useState(0);
+  const [selectedOrderId, setSelectedOrderId] = useState("");
 
   const { data: ordersResponse } = useQuery<{ orders: (Order & { items: any[] })[]; pagination: any }>({
     queryKey: ["/api/admin/orders"],
@@ -589,19 +552,14 @@ function BatchCompletionDialog({ batch, onClose, onComplete, isPending }: BatchC
   ) || [];
 
   useEffect(() => {
-    const initialQuantities: Record<string, number> = {};
-    batch.items?.forEach((item: any) => {
-      initialQuantities[item.productId] = item.quantity;
-    });
-    setFreezerQuantities(initialQuantities);
-  }, [batch.items]);
+    if (destination === "split") {
+      setOrderQty(session.quantity - freezerQty);
+    }
+  }, [freezerQty, destination, session.quantity]);
 
   const handleConfirm = () => {
-    if (completionMode === "order" && selectedOrderId) {
-      onComplete(selectedOrderId, "baking");
-    } else {
-      onComplete();
-    }
+    if (destination === "order" && !selectedOrderId) return;
+    onComplete(destination, selectedOrderId, freezerQty, orderQty);
   };
 
   return (
@@ -609,89 +567,115 @@ function BatchCompletionDialog({ batch, onClose, onComplete, isPending }: BatchC
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-serif">
-            <CheckCircle className="h-5 w-5" />
-            Complete Batch
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            Bake Complete!
           </DialogTitle>
         </DialogHeader>
 
         <div className="py-4 space-y-4">
-          <div>
-            <h4 className="font-medium mb-2">Batch Items</h4>
-            <div className="space-y-2">
-              {batch.items?.map((item: any) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
-                  data-testid={`completion-item-${item.productId}`}
-                >
-                  <span>{item.product?.name}</span>
-                  <Badge variant="secondary">{item.quantity} units</Badge>
-                </div>
-              ))}
+          <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+            <div className="flex items-center justify-between">
+              <span className="font-medium">{session.productName}</span>
+              <Badge>{session.quantity} bagels</Badge>
             </div>
           </div>
 
           <div className="space-y-3">
             <div
-              className={`p-3 rounded-lg border cursor-pointer ${
-                completionMode === "freezer" ? "border-primary bg-primary/5" : "border-border"
+              className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                destination === "freezer" ? "border-primary bg-primary/5" : "border-border hover-elevate"
               }`}
-              onClick={() => setCompletionMode("freezer")}
-              data-testid="option-add-to-freezer"
+              onClick={() => setDestination("freezer")}
+              data-testid="option-freezer"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <Snowflake className="h-4 w-4" />
-                <span className="font-medium">Add to Freezer</span>
+              <div className="flex items-center gap-3">
+                <Snowflake className="h-5 w-5 text-blue-500" />
+                <div>
+                  <span className="font-medium">Add to Freezer</span>
+                  <p className="text-sm text-muted-foreground">Store for later orders</p>
+                </div>
               </div>
-              {completionMode === "freezer" && (
-                <div className="space-y-2 mt-3">
-                  {batch.items?.map((item: any) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between"
-                      data-testid={`freezer-qty-${item.productId}`}
-                    >
-                      <span className="text-sm">{item.product?.name}</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        className="w-20"
-                        value={freezerQuantities[item.productId] || 0}
-                        onChange={(e) =>
-                          setFreezerQuantities((prev) => ({
-                            ...prev,
-                            [item.productId]: parseInt(e.target.value) || 0,
-                          }))
-                        }
-                        data-testid={`input-freezer-qty-${item.productId}`}
-                      />
-                    </div>
-                  ))}
+            </div>
+
+            <div
+              className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                destination === "order" ? "border-primary bg-primary/5" : "border-border hover-elevate"
+              }`}
+              onClick={() => setDestination("order")}
+              data-testid="option-order"
+            >
+              <div className="flex items-center gap-3">
+                <Package className="h-5 w-5 text-orange-500" />
+                <div>
+                  <span className="font-medium">Fulfill Order</span>
+                  <p className="text-sm text-muted-foreground">Apply to pending order</p>
+                </div>
+              </div>
+              {destination === "order" && (
+                <div className="mt-3">
+                  {pendingOrders.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No pending orders</p>
+                  ) : (
+                    <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
+                      <SelectTrigger data-testid="select-order">
+                        <SelectValue placeholder="Select order..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pendingOrders.map((order) => (
+                          <SelectItem key={order.id} value={order.id}>
+                            {order.customerName} - {format(new Date(order.fulfillmentDate), "MMM d")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               )}
             </div>
 
             <div
-              className={`p-3 rounded-lg border cursor-pointer ${
-                completionMode === "order" ? "border-primary bg-primary/5" : "border-border"
+              className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                destination === "split" ? "border-primary bg-primary/5" : "border-border hover-elevate"
               }`}
-              onClick={() => setCompletionMode("order")}
-              data-testid="option-fulfill-order"
+              onClick={() => setDestination("split")}
+              data-testid="option-split"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <Package className="h-4 w-4" />
-                <span className="font-medium">Fulfill Order</span>
+              <div className="flex items-center gap-3">
+                <div className="flex">
+                  <Snowflake className="h-4 w-4 text-blue-500" />
+                  <Package className="h-4 w-4 text-orange-500 -ml-1" />
+                </div>
+                <div>
+                  <span className="font-medium">Split</span>
+                  <p className="text-sm text-muted-foreground">Some to freezer, some to order</p>
+                </div>
               </div>
-              {completionMode === "order" && (
-                <div className="mt-3">
-                  {pendingOrders.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No pending orders available
-                    </p>
-                  ) : (
+              {destination === "split" && (
+                <div className="mt-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm flex items-center gap-2">
+                      <Snowflake className="h-4 w-4 text-blue-500" /> Freezer
+                    </span>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={session.quantity}
+                      value={freezerQty}
+                      onChange={(e) => setFreezerQty(Math.min(session.quantity, parseInt(e.target.value) || 0))}
+                      className="w-20"
+                      data-testid="input-freezer-qty"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm flex items-center gap-2">
+                      <Package className="h-4 w-4 text-orange-500" /> Order
+                    </span>
+                    <Badge variant="secondary">{orderQty}</Badge>
+                  </div>
+                  {orderQty > 0 && pendingOrders.length > 0 && (
                     <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
-                      <SelectTrigger data-testid="select-order-to-fulfill">
-                        <SelectValue placeholder="Select an order..." />
+                      <SelectTrigger data-testid="select-split-order">
+                        <SelectValue placeholder="Select order..." />
                       </SelectTrigger>
                       <SelectContent>
                         {pendingOrders.map((order) => (
@@ -709,15 +693,73 @@ function BatchCompletionDialog({ batch, onClose, onComplete, isPending }: BatchC
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isPending || (completionMode === "order" && !selectedOrderId)}
-            data-testid="button-confirm-complete-batch"
+            disabled={isPending || (destination === "order" && !selectedOrderId) || (destination === "split" && orderQty > 0 && !selectedOrderId)}
+            data-testid="button-confirm-complete"
           >
-            {isPending ? "Completing..." : "Complete Batch"}
+            {isPending ? "Completing..." : "Complete"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface QuantityDialogProps {
+  product: Product;
+  onConfirm: (quantity: number) => void;
+  onClose: () => void;
+}
+
+function QuantityDialog({ product, onConfirm, onClose }: QuantityDialogProps) {
+  const [quantity, setQuantity] = useState(12);
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="font-serif">How many {product.name}?</DialogTitle>
+        </DialogHeader>
+        <div className="py-6">
+          <div className="flex items-center justify-center gap-4">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => setQuantity(Math.max(1, quantity - 6))}
+              data-testid="button-qty-decrease"
+            >
+              -6
+            </Button>
+            <Input
+              type="number"
+              min={1}
+              value={quantity}
+              onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+              className="w-24 text-center text-2xl font-bold"
+              data-testid="input-quantity"
+            />
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => setQuantity(quantity + 6)}
+              data-testid="button-qty-increase"
+            >
+              +6
+            </Button>
+          </div>
+          <p className="text-center text-muted-foreground mt-3">bagels</p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={() => onConfirm(quantity)} data-testid="button-start-baking">
+            <Flame className="h-4 w-4 mr-2" />
+            Start Baking
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -727,65 +769,65 @@ function BatchCompletionDialog({ batch, onClose, onComplete, isPending }: BatchC
 
 export default function AdminBake() {
   const { toast } = useToast();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [batchItems, setBatchItems] = useState<Record<string, number>>({});
-  const [checklistBatch, setChecklistBatch] = useState<(Batch & { items: any[] }) | null>(null);
-  const [completionBatch, setCompletionBatch] = useState<(Batch & { items: any[] }) | null>(null);
-
-  const { data: batchesResponse, isLoading } = useQuery<{ batches: (Batch & { items: any[] })[]; pagination: any } | (Batch & { items: any[] })[]>({
-    queryKey: ["/api/admin/batches"],
-  });
-
-  const batches = Array.isArray(batchesResponse) ? batchesResponse : (batchesResponse?.batches || []);
+  const [session, setSession] = useState<BakeSession | null>(loadSession);
+  const [isDragging, setIsDragging] = useState(false);
+  const [quantityProduct, setQuantityProduct] = useState<Product | null>(null);
+  const [showCompletion, setShowCompletion] = useState(false);
+  const [scaledIngredients, setScaledIngredients] = useState<Array<{ name: string; quantity: number; unit: string }>>([]);
 
   const { data: products } = useQuery<Product[]>({
     queryKey: ["/api/admin/products"],
   });
 
-  const form = useForm<BatchFormData>({
-    resolver: zodResolver(batchFormSchema),
-    defaultValues: {
-      shift: "",
-      notes: "",
-      items: [],
-    },
+  const { data: ingredients } = useQuery<Ingredient[]>({
+    queryKey: ["/api/admin/ingredients"],
   });
+
+  const activeProducts = products?.filter((p) => p.isActive) || [];
+  const displayProducts = activeProducts.slice(0, 3);
+
+  useEffect(() => {
+    saveSession(session);
+  }, [session]);
+
+  useEffect(() => {
+    async function fetchScaledIngredients() {
+      if (!session) return;
+      
+      try {
+        const response = await fetch(`/api/admin/products/${session.productId}/bom`, {
+          credentials: "include",
+        });
+        if (response.ok) {
+          const bom: (BillOfMaterial & { ingredient: Ingredient })[] = await response.json();
+          const scaled = bom.map((item) => ({
+            name: item.ingredient.name,
+            quantity: parseFloat(item.quantity) * session.quantity,
+            unit: item.ingredient.unit,
+          }));
+          setScaledIngredients(scaled);
+        }
+      } catch (error) {
+        console.error("Failed to fetch BOM", error);
+      }
+    }
+    
+    fetchScaledIngredients();
+  }, [session?.productId, session?.quantity]);
 
   const createBatchMutation = useMutation({
-    mutationFn: async (data: BatchFormData) => {
-      const items = Object.entries(batchItems)
-        .filter(([_, qty]) => qty > 0)
-        .map(([productId, quantity]) => ({ productId, quantity }));
-      return await apiRequest("POST", "/api/admin/batches", { ...data, items });
+    mutationFn: async (data: { productId: string; quantity: number }) => {
+      return await apiRequest("POST", "/api/admin/batches", {
+        batchDate: new Date(),
+        shift: "morning",
+        items: [{ productId: data.productId, quantity: data.quantity }],
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/batches"] });
-      toast({ title: "Batch Created", description: "Production batch has been scheduled" });
-      setIsDialogOpen(false);
-      form.reset();
-      setBatchItems({});
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const updateBatchStatusMutation = useMutation({
-    mutationFn: async ({ batchId, status }: { batchId: string; status: string }) => {
-      return await apiRequest("PATCH", `/api/admin/batches/${batchId}/status`, { status });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/batches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/ingredients"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/freezer"] });
-      toast({ title: "Batch Updated", description: "Batch status has been updated" });
-      setChecklistBatch(null);
-      setCompletionBatch(null);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      setChecklistBatch(null);
-      setCompletionBatch(null);
     },
   });
 
@@ -796,47 +838,107 @@ export default function AdminBake() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/orders"] });
     },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+  });
+
+  const addToFreezerMutation = useMutation({
+    mutationFn: async (data: { productId: string; quantity: number }) => {
+      return await apiRequest("POST", "/api/admin/freezer", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/freezer"] });
     },
   });
 
-  const activeProducts = products?.filter((p) => p.isActive) || [];
-
-  const onSubmit = (data: BatchFormData) => {
-    createBatchMutation.mutate(data);
+  const handleDrop = (product: Product) => {
+    setIsDragging(false);
+    setQuantityProduct(product);
   };
 
-  const handleStartBatch = (batch: Batch & { items: any[] }) => {
-    setChecklistBatch(batch);
-  };
+  const handleStartBake = (quantity: number) => {
+    if (!quantityProduct) return;
 
-  const confirmStartBatch = () => {
-    if (checklistBatch) {
-      updateBatchStatusMutation.mutate({ batchId: checklistBatch.id, status: "in_progress" });
-    }
-  };
-
-  const handleCompleteBatch = (batch: Batch & { items: any[] }) => {
-    setCompletionBatch(batch);
-  };
-
-  const confirmCompleteBatch = async (orderId?: string, orderStatus?: string) => {
-    if (completionBatch) {
-      await updateBatchStatusMutation.mutateAsync({ batchId: completionBatch.id, status: "completed" });
-      if (orderId && orderStatus) {
-        await updateOrderStatusMutation.mutateAsync({ orderId, status: orderStatus });
+    const timers: Record<string, { running: boolean; timeLeft: number; totalTime: number }> = {};
+    for (const step of BAKE_STEPS) {
+      if (step.hasTimer && step.defaultMinutes) {
+        timers[step.id] = {
+          running: false,
+          timeLeft: step.defaultMinutes * 60,
+          totalTime: step.defaultMinutes * 60,
+        };
       }
     }
+
+    const newSession: BakeSession = {
+      productId: quantityProduct.id,
+      productName: quantityProduct.name,
+      quantity,
+      startedAt: new Date(),
+      completedSteps: [],
+      stepNotes: {},
+      stepTimers: timers,
+    };
+
+    setSession(newSession);
+    setQuantityProduct(null);
+    
+    createBatchMutation.mutate({ productId: quantityProduct.id, quantity });
+    
+    toast({
+      title: "Bake Started!",
+      description: `Starting ${quantity} ${quantityProduct.name}`,
+    });
   };
 
-  const inProgressBatches = batches.filter(b => b.status === "in_progress");
-  const plannedBatches = batches.filter(b => b.status === "planned");
-  const completedBatches = batches.filter(b => b.status === "completed").slice(0, 5);
+  const handleUpdateSession = (updated: BakeSession) => {
+    setSession(updated);
+  };
+
+  const handleComplete = () => {
+    setShowCompletion(true);
+  };
+
+  const handleConfirmComplete = async (
+    destination: "freezer" | "order" | "split",
+    orderId?: string,
+    freezerQty?: number,
+    orderQty?: number
+  ) => {
+    if (!session) return;
+
+    try {
+      if (destination === "freezer") {
+        await addToFreezerMutation.mutateAsync({
+          productId: session.productId,
+          quantity: session.quantity,
+        });
+        toast({ title: "Added to Freezer", description: `${session.quantity} ${session.productName} added to freezer` });
+      } else if (destination === "order" && orderId) {
+        await updateOrderStatusMutation.mutateAsync({ orderId, status: "baking" });
+        toast({ title: "Order Updated", description: "Order marked as baking" });
+      } else if (destination === "split") {
+        if (freezerQty && freezerQty > 0) {
+          await addToFreezerMutation.mutateAsync({
+            productId: session.productId,
+            quantity: freezerQty,
+          });
+        }
+        if (orderId && orderQty && orderQty > 0) {
+          await updateOrderStatusMutation.mutateAsync({ orderId, status: "baking" });
+        }
+        toast({ title: "Split Complete", description: `${freezerQty} to freezer, ${orderQty} to order` });
+      }
+
+      setSession(null);
+      setShowCompletion(false);
+      setScaledIngredients([]);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to complete bake", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="font-serif text-3xl font-bold flex items-center gap-3">
             <ChefHat className="h-8 w-8" />
@@ -844,303 +946,67 @@ export default function AdminBake() {
           </h1>
           <p className="text-muted-foreground mt-1">Your baking control center</p>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)} data-testid="button-new-batch">
-          <Plus className="h-4 w-4 mr-2" />
-          New Batch
-        </Button>
+        {session && (
+          <Badge variant="outline" className="bg-orange-500/10 text-orange-600 border-orange-500/20">
+            <Timer className="h-3 w-3 mr-1" />
+            Bake in Progress
+          </Badge>
+        )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          <RecipesSection />
-
-          {inProgressBatches.length > 0 && (
-            <Card className="border-orange-500/30">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-600">
-                  <Play className="h-5 w-5" />
-                  Active Bakes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {inProgressBatches.map((batch) => (
-                    <div
-                      key={batch.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-orange-500/20 bg-orange-500/5 gap-4"
-                      data-testid={`batch-card-${batch.id}`}
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-1">
-                          <span className="font-semibold">
-                            {format(new Date(batch.batchDate), "MMM d, yyyy")}
-                          </span>
-                          <Badge variant="outline">{batch.shift}</Badge>
-                          <Badge variant="outline" className={statusColors[batch.status]}>
-                            in progress
-                          </Badge>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {batch.items?.map((item: any, index: number) => (
-                            <Badge key={index} variant="secondary">
-                              {item.product?.name}: {item.quantity}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <Button
-                        onClick={() => handleCompleteBatch(batch)}
-                        disabled={updateBatchStatusMutation.isPending}
-                        data-testid={`button-complete-${batch.id}`}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Complete
-                      </Button>
-                    </div>
-                  ))}
+      {!session ? (
+        <>
+          <div className="grid grid-cols-3 gap-4">
+            {displayProducts.length > 0 ? (
+              displayProducts.map((product) => (
+                <FlippableTile
+                  key={product.id}
+                  product={product}
+                  ingredients={ingredients || []}
+                  onDragStart={() => setIsDragging(true)}
+                />
+              ))
+            ) : (
+              [1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="aspect-square rounded-xl border-2 border-dashed border-border flex items-center justify-center"
+                >
+                  <p className="text-muted-foreground text-sm text-center p-4">
+                    No products yet
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              ))
+            )}
+          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5" />
-                Scheduled Batches
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-24 w-full" />
-                  ))}
-                </div>
-              ) : plannedBatches.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <CalendarIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No batches scheduled</p>
-                  <Button className="mt-4" onClick={() => setIsDialogOpen(true)}>
-                    Schedule First Batch
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {plannedBatches.map((batch) => (
-                    <div
-                      key={batch.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-border gap-4"
-                      data-testid={`batch-card-${batch.id}`}
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-1">
-                          <span className="font-semibold">
-                            {format(new Date(batch.batchDate), "MMM d, yyyy")}
-                          </span>
-                          <Badge variant="outline">{batch.shift}</Badge>
-                          <Badge variant="outline" className={statusColors[batch.status]}>
-                            {batch.status}
-                          </Badge>
-                        </div>
-                        {batch.notes && (
-                          <p className="text-sm text-muted-foreground">{batch.notes}</p>
-                        )}
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {batch.items?.map((item: any, index: number) => (
-                            <Badge key={index} variant="secondary">
-                              {item.product?.name}: {item.quantity}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <Button
-                        onClick={() => handleStartBatch(batch)}
-                        disabled={updateBatchStatusMutation.isPending}
-                        data-testid={`button-start-${batch.id}`}
-                      >
-                        <Play className="h-4 w-4 mr-2" />
-                        Start
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {completedBatches.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-muted-foreground">
-                  <CheckCircle className="h-5 w-5" />
-                  Recently Completed
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {completedBatches.map((batch) => (
-                    <div
-                      key={batch.id}
-                      className="flex items-center justify-between p-3 rounded-lg border border-border opacity-75"
-                      data-testid={`batch-card-${batch.id}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm">
-                          {format(new Date(batch.batchDate), "MMM d, yyyy")}
-                        </span>
-                        <Badge variant="outline" className="text-xs">{batch.shift}</Badge>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {batch.items?.slice(0, 3).map((item: any, index: number) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {item.product?.name}: {item.quantity}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        <div>
-          <BakingTimer />
-        </div>
-      </div>
-
-      {checklistBatch && (
-        <IngredientChecklist
-          batch={checklistBatch}
-          onClose={() => setChecklistBatch(null)}
-          onConfirmStart={confirmStartBatch}
-          isPending={updateBatchStatusMutation.isPending}
+          <OvenWidget onDrop={handleDrop} isDragging={isDragging} />
+        </>
+      ) : (
+        <BakeChecklist
+          session={session}
+          onUpdateSession={handleUpdateSession}
+          onComplete={handleComplete}
+          scaledIngredients={scaledIngredients}
         />
       )}
 
-      {completionBatch && (
-        <BatchCompletionDialog
-          batch={completionBatch}
-          onClose={() => setCompletionBatch(null)}
-          onComplete={confirmCompleteBatch}
-          isPending={updateBatchStatusMutation.isPending || updateOrderStatusMutation.isPending}
+      {quantityProduct && (
+        <QuantityDialog
+          product={quantityProduct}
+          onConfirm={handleStartBake}
+          onClose={() => setQuantityProduct(null)}
         />
       )}
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-serif">Schedule New Batch</DialogTitle>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="batchDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Batch Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start text-left font-normal"
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {field.value ? format(field.value, "PPP") : "Pick a date"}
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="shift"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Shift</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select shift" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="morning">Morning</SelectItem>
-                          <SelectItem value="afternoon">Afternoon</SelectItem>
-                          <SelectItem value="evening">Evening</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div>
-                <FormLabel>Products to Bake</FormLabel>
-                <div className="space-y-2 mt-2">
-                  {activeProducts.map((product) => (
-                    <div key={product.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                      <span>{product.name}</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        className="w-24"
-                        value={batchItems[product.id] || 0}
-                        onChange={(e) => setBatchItems(prev => ({
-                          ...prev,
-                          [product.id]: parseInt(e.target.value) || 0
-                        }))}
-                        data-testid={`input-qty-${product.id}`}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes (optional)</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} placeholder="Any special notes for this batch" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createBatchMutation.isPending}>
-                  {createBatchMutation.isPending ? "Creating..." : "Create Batch"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      {showCompletion && session && (
+        <CompletionDialog
+          session={session}
+          onClose={() => setShowCompletion(false)}
+          onComplete={handleConfirmComplete}
+          isPending={addToFreezerMutation.isPending || updateOrderStatusMutation.isPending}
+        />
+      )}
     </div>
   );
 }
