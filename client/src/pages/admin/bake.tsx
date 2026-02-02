@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
@@ -14,11 +14,10 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Timer, Play, Pause, RotateCcw, CheckCircle, ChefHat, 
   Snowflake, Package, Flame, Clock, StickyNote,
-  ThermometerSun, Volume2, Check
+  ThermometerSun, Eye
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Product, Ingredient, BillOfMaterial, Order } from "@shared/schema";
-import ovenHeroImage from "../../assets/images/oven-fire.jpg";
 import bagelTileImage from "../../assets/images/bagel-tile.jpg";
 
 const BAKE_STEPS = [
@@ -68,17 +67,58 @@ function saveSession(session: BakeSession | null) {
   }
 }
 
-interface FlippableTileProps {
+interface BagelCardProps {
   product: Product;
-  ingredients: Ingredient[];
-  isSelected: boolean;
-  onSelect: (product: Product) => void;
+  onViewRecipe: (product: Product) => void;
+  onBake: (product: Product) => void;
 }
 
-function FlippableTile({ product, ingredients, isSelected, onSelect }: FlippableTileProps) {
-  const [isFlipped, setIsFlipped] = useState(false);
-  
-  const { data: bom } = useQuery<(BillOfMaterial & { ingredient: Ingredient })[]>({
+function BagelCard({ product, onViewRecipe, onBake }: BagelCardProps) {
+  return (
+    <Card 
+      className="overflow-hidden"
+      data-testid={`card-${product.id}`}
+    >
+      <div className="flex aspect-[16/9]">
+        <div className="w-1/2 relative">
+          <img
+            src={product.imageUrl || bagelTileImage}
+            alt={product.name}
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div className="w-1/2 p-4 flex flex-col justify-center">
+          <h3 className="font-serif text-xl font-bold mb-4">{product.name}</h3>
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onViewRecipe(product)}
+              data-testid={`button-view-recipe-${product.id}`}
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              View Recipe
+            </Button>
+            <Button
+              onClick={() => onBake(product)}
+              data-testid={`button-bake-${product.id}`}
+            >
+              <Flame className="h-4 w-4 mr-2" />
+              Bake
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+interface RecipeModalProps {
+  product: Product;
+  onClose: () => void;
+}
+
+function RecipeModal({ product, onClose }: RecipeModalProps) {
+  const { data: bom, isLoading } = useQuery<(BillOfMaterial & { ingredient: Ingredient })[]>({
     queryKey: ["/api/admin/products", product.id, "bom"],
     queryFn: async () => {
       const response = await fetch(`/api/admin/products/${product.id}/bom`, {
@@ -89,210 +129,128 @@ function FlippableTile({ product, ingredients, isSelected, onSelect }: Flippable
     },
   });
 
-  const handleFrontClick = () => {
-    setIsFlipped(true);
-  };
-
-  const handleSelectClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSelect(product);
-  };
-
-  const handleFlipBack = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsFlipped(false);
-  };
-
   return (
-    <div
-      className="relative w-full aspect-[16/9] cursor-pointer perspective-1000"
-      style={{ perspective: "1000px" }}
-      data-testid={`tile-${product.id}`}
-    >
-      <div
-        className={`relative w-full h-full transition-transform duration-500 preserve-3d ${isFlipped ? "rotate-y-180" : ""}`}
-        style={{
-          transformStyle: "preserve-3d",
-          transform: isFlipped ? "rotateY(180deg)" : "rotateY(0)",
-        }}
-      >
-        <div
-          className={`absolute inset-0 rounded-xl overflow-hidden border-2 shadow-lg backface-hidden transition-all ${
-            isSelected ? "border-primary ring-2 ring-primary/30" : "border-border"
-          }`}
-          style={{ backfaceVisibility: "hidden" }}
-          onClick={handleFrontClick}
-        >
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent z-10" />
-          <img
-            src={product.imageUrl || bagelTileImage}
-            alt={product.name}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute bottom-0 left-0 right-0 p-5 z-20">
-            <h3 className="text-white font-serif text-2xl font-bold">{product.name}</h3>
-            <p className="text-white/80 text-base mt-1">Tap to see recipe</p>
-          </div>
-          {isSelected && (
-            <div className="absolute top-3 right-3 z-20">
-              <Badge className="bg-primary text-primary-foreground">
-                <Check className="h-3 w-3 mr-1" />
-                Selected
-              </Badge>
-            </div>
-          )}
-        </div>
-        
-        <div
-          className={`absolute inset-0 rounded-xl bg-card border-2 shadow-lg p-5 overflow-auto backface-hidden transition-all ${
-            isSelected ? "border-primary ring-2 ring-primary/30" : "border-border"
-          }`}
-          style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
-        >
-          <h3 className="font-serif text-xl font-bold mb-4">{product.name} Recipe</h3>
-          {bom && bom.length > 0 ? (
-            <div className="space-y-2 mb-4">
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-xl">{product.name} Recipe</DialogTitle>
+          <DialogDescription>Ingredients needed for this bagel</DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          {isLoading ? (
+            <p className="text-muted-foreground">Loading ingredients...</p>
+          ) : bom && bom.length > 0 ? (
+            <div className="space-y-2">
               {bom.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between text-base py-1.5 border-b border-border/50 last:border-0"
+                  className="flex items-center justify-between py-2 border-b border-border/50 last:border-0"
                 >
                   <span className="font-medium">{item.ingredient.name}</span>
-                  <Badge variant="secondary" className="text-sm">
+                  <Badge variant="secondary">
                     {parseFloat(item.quantity).toFixed(2)} {item.ingredient.unit}
                   </Badge>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground text-base mb-4">No ingredients defined</p>
+            <p className="text-muted-foreground">No ingredients defined for this product</p>
           )}
-          <div className="flex gap-2 mt-auto pt-4 border-t border-border">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={handleFlipBack}
-              data-testid={`button-flip-back-${product.id}`}
-            >
-              Flip Back
-            </Button>
-            <Button
-              className={`flex-1 ${isSelected ? "bg-primary/80" : ""}`}
-              onClick={handleSelectClick}
-              data-testid={`button-select-${product.id}`}
-            >
-              {isSelected ? (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Selected
-                </>
-              ) : (
-                <>
-                  <Flame className="h-4 w-4 mr-2" />
-                  Select for Baking
-                </>
-              )}
-            </Button>
-          </div>
         </div>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-interface OvenWidgetProps {
-  selectedProduct: Product | null;
-  onClick: () => void;
-}
-
-function OvenWidget({ selectedProduct, onClick }: OvenWidgetProps) {
-  const hasSelection = !!selectedProduct;
-
-  return (
-    <div
-      className={`relative w-full h-48 md:h-64 rounded-xl overflow-hidden border-2 transition-all duration-300 cursor-pointer ${
-        hasSelection
-          ? "border-primary shadow-lg shadow-primary/20 hover:scale-[1.01]"
-          : "border-border hover:border-primary/50"
-      }`}
-      onClick={onClick}
-      data-testid="oven-widget"
-    >
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20 z-10" />
-      <img
-        src={ovenHeroImage}
-        alt="Bakery oven"
-        className="w-full h-full object-cover"
-      />
-      <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
-        <Flame className={`h-12 w-12 mb-3 transition-all ${hasSelection ? "text-orange-400 animate-pulse" : "text-white/80"}`} />
-        <h2 className="text-white font-serif text-2xl md:text-3xl font-bold text-center">
-          {hasSelection ? `Bake ${selectedProduct.name}` : "Start Bake"}
-        </h2>
-        <p className="text-white/70 text-sm mt-2">
-          {hasSelection ? "Click to set quantity and begin" : "Select a bagel above first"}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-interface StepTimerProps {
-  stepId: string;
-  timeLeft: number;
-  totalTime: number;
-  isRunning: boolean;
+interface ClockWidgetProps {
+  activeTimerStep: string | null;
+  stepTimers: Record<string, { running: boolean; timeLeft: number; totalTime: number }>;
   onStart: () => void;
   onPause: () => void;
   onReset: () => void;
 }
 
-function StepTimer({ stepId, timeLeft, totalTime, isRunning, onStart, onPause, onReset }: StepTimerProps) {
+function ClockWidget({ activeTimerStep, stepTimers, onStart, onPause, onReset }: ClockWidgetProps) {
+  const activeTimer = activeTimerStep ? stepTimers[activeTimerStep] : null;
+  const activeStep = activeTimerStep ? BAKE_STEPS.find(s => s.id === activeTimerStep) : null;
+  
+  const timeLeft = activeTimer?.timeLeft ?? 0;
+  const totalTime = activeTimer?.totalTime ?? 1;
+  const isRunning = activeTimer?.running ?? false;
+  
   const progress = totalTime > 0 ? ((totalTime - timeLeft) / totalTime) * 100 : 0;
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
 
+  const circumference = 2 * Math.PI * 70;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+
   return (
-    <div className="flex items-center gap-3 bg-muted/50 rounded-full px-4 py-2" data-testid={`timer-${stepId}`}>
-      <div className="relative w-12 h-12">
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+    <div 
+      className="flex flex-col items-center justify-center p-6 bg-muted/30 rounded-xl border border-border"
+      data-testid="clock-widget"
+    >
+      <div className="relative w-48 h-48 mb-4">
+        <svg className="w-full h-full -rotate-90" viewBox="0 0 160 160">
           <circle
-            cx="18"
-            cy="18"
-            r="15"
+            cx="80"
+            cy="80"
+            r="70"
             fill="none"
             stroke="currentColor"
-            strokeWidth="3"
+            strokeWidth="8"
             className="text-muted"
           />
           <circle
-            cx="18"
-            cy="18"
-            r="15"
+            cx="80"
+            cy="80"
+            r="70"
             fill="none"
             stroke="currentColor"
-            strokeWidth="3"
-            strokeDasharray={`${progress} 100`}
-            className={isRunning ? "text-orange-500" : "text-primary"}
+            strokeWidth="8"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            className={isRunning ? "text-orange-500 transition-all duration-1000" : "text-primary transition-all duration-300"}
           />
         </svg>
-        <Clock className="absolute inset-0 m-auto w-5 h-5 text-muted-foreground" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          {activeTimerStep ? (
+            <>
+              <div className="font-mono text-4xl font-bold tabular-nums">
+                {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">{activeStep?.name}</div>
+            </>
+          ) : (
+            <div className="text-center text-muted-foreground px-4">
+              <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Select a timer below</p>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="font-mono text-lg font-bold tabular-nums min-w-[60px]">
-        {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
-      </div>
-      <div className="flex gap-1">
+      
+      <div className="flex gap-2">
         {isRunning ? (
-          <Button size="icon" variant="ghost" onClick={onPause} data-testid={`button-pause-${stepId}`}>
-            <Pause className="h-4 w-4" />
+          <Button size="lg" variant="outline" onClick={onPause} disabled={!activeTimerStep}>
+            <Pause className="h-5 w-5 mr-2" />
+            Pause
           </Button>
         ) : (
-          <Button size="icon" variant="ghost" onClick={onStart} disabled={timeLeft === 0} data-testid={`button-start-${stepId}`}>
-            <Play className="h-4 w-4" />
+          <Button size="lg" onClick={onStart} disabled={!activeTimerStep || timeLeft === 0}>
+            <Play className="h-5 w-5 mr-2" />
+            Start
           </Button>
         )}
-        <Button size="icon" variant="ghost" onClick={onReset} data-testid={`button-reset-${stepId}`}>
-          <RotateCcw className="h-4 w-4" />
+        <Button size="lg" variant="outline" onClick={onReset} disabled={!activeTimerStep}>
+          <RotateCcw className="h-5 w-5 mr-2" />
+          Reset
         </Button>
       </div>
     </div>
@@ -310,6 +268,7 @@ function BakeChecklist({ session, onUpdateSession, onComplete, scaledIngredients
   const { toast } = useToast();
   const audioContextRef = useRef<AudioContext | null>(null);
   const [expandedNotes, setExpandedNotes] = useState<string | null>(null);
+  const [activeTimerStep, setActiveTimerStep] = useState<string | null>(null);
 
   const playBeep = () => {
     try {
@@ -380,33 +339,40 @@ function BakeChecklist({ session, onUpdateSession, onComplete, scaledIngredients
     });
   };
 
-  const startTimer = (stepId: string) => {
+  const startActiveTimer = () => {
+    if (!activeTimerStep) return;
     const newTimers = { ...session.stepTimers };
-    if (newTimers[stepId]) {
-      newTimers[stepId].running = true;
+    if (newTimers[activeTimerStep]) {
+      newTimers[activeTimerStep].running = true;
     }
     onUpdateSession({ ...session, stepTimers: newTimers });
   };
 
-  const pauseTimer = (stepId: string) => {
+  const pauseActiveTimer = () => {
+    if (!activeTimerStep) return;
     const newTimers = { ...session.stepTimers };
-    if (newTimers[stepId]) {
-      newTimers[stepId].running = false;
+    if (newTimers[activeTimerStep]) {
+      newTimers[activeTimerStep].running = false;
     }
     onUpdateSession({ ...session, stepTimers: newTimers });
   };
 
-  const resetTimer = (stepId: string) => {
-    const step = BAKE_STEPS.find(s => s.id === stepId);
+  const resetActiveTimer = () => {
+    if (!activeTimerStep) return;
+    const step = BAKE_STEPS.find(s => s.id === activeTimerStep);
     const newTimers = { ...session.stepTimers };
-    if (newTimers[stepId] && step?.defaultMinutes) {
-      newTimers[stepId] = {
+    if (newTimers[activeTimerStep] && step?.defaultMinutes) {
+      newTimers[activeTimerStep] = {
         running: false,
         timeLeft: step.defaultMinutes * 60,
         totalTime: step.defaultMinutes * 60,
       };
     }
     onUpdateSession({ ...session, stepTimers: newTimers });
+  };
+
+  const selectTimer = (stepId: string) => {
+    setActiveTimerStep(stepId);
   };
 
   const completedCount = session.completedSteps.length;
@@ -438,31 +404,22 @@ function BakeChecklist({ session, onUpdateSession, onComplete, scaledIngredients
           </div>
         </div>
 
-        {session.completedSteps.length === 0 && scaledIngredients.length > 0 && (
-          <div className="mb-6 p-4 rounded-lg bg-muted/50 border border-border">
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <ThermometerSun className="h-4 w-4" />
-              Scaled Ingredients for {session.quantity} bagels
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {scaledIngredients.map((ing, i) => (
-                <div key={i} className="flex justify-between text-sm py-1">
-                  <span>{ing.name}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {ing.quantity.toFixed(2)} {ing.unit}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <ClockWidget
+          activeTimerStep={activeTimerStep}
+          stepTimers={session.stepTimers}
+          onStart={startActiveTimer}
+          onPause={pauseActiveTimer}
+          onReset={resetActiveTimer}
+        />
 
-        <div className="space-y-3">
+        <div className="space-y-3 mt-6">
           {BAKE_STEPS.map((step) => {
             const isComplete = session.completedSteps.includes(step.id);
             const timer = session.stepTimers[step.id];
             const note = session.stepNotes[step.id] || "";
             const showNotes = expandedNotes === step.id;
+            const isActiveTimer = activeTimerStep === step.id;
+            const isGatherStep = step.id === "gather";
 
             return (
               <div
@@ -470,6 +427,8 @@ function BakeChecklist({ session, onUpdateSession, onComplete, scaledIngredients
                 className={`p-4 rounded-lg border transition-all ${
                   isComplete
                     ? "bg-green-500/10 border-green-500/30"
+                    : isActiveTimer
+                    ? "bg-orange-500/10 border-orange-500/30"
                     : "bg-card border-border hover-elevate"
                 }`}
                 data-testid={`step-${step.id}`}
@@ -497,15 +456,21 @@ function BakeChecklist({ session, onUpdateSession, onComplete, scaledIngredients
 
                   <div className="flex items-center gap-2 ml-11 sm:ml-0">
                     {step.hasTimer && timer && (
-                      <StepTimer
-                        stepId={step.id}
-                        timeLeft={timer.timeLeft}
-                        totalTime={timer.totalTime}
-                        isRunning={timer.running}
-                        onStart={() => startTimer(step.id)}
-                        onPause={() => pauseTimer(step.id)}
-                        onReset={() => resetTimer(step.id)}
-                      />
+                      <button
+                        onClick={() => selectTimer(step.id)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                          isActiveTimer
+                            ? "bg-orange-500 text-white"
+                            : timer.running
+                            ? "bg-orange-500/20 text-orange-600"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                        data-testid={`timer-bubble-${step.id}`}
+                      >
+                        <Timer className="h-3.5 w-3.5" />
+                        {Math.floor(timer.timeLeft / 60)}:{String(timer.timeLeft % 60).padStart(2, "0")}
+                        {timer.running && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
+                      </button>
                     )}
                     <Button
                       size="icon"
@@ -517,6 +482,25 @@ function BakeChecklist({ session, onUpdateSession, onComplete, scaledIngredients
                     </Button>
                   </div>
                 </div>
+
+                {isGatherStep && scaledIngredients.length > 0 && (
+                  <div className="mt-3 ml-11 p-3 rounded-lg bg-muted/50 border border-border">
+                    <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+                      <ThermometerSun className="h-4 w-4" />
+                      Scaled for {session.quantity} bagels
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {scaledIngredients.map((ing, i) => (
+                        <div key={i} className="flex justify-between text-sm py-1">
+                          <span>{ing.name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {ing.quantity.toFixed(2)} {ing.unit}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {showNotes && (
                   <div className="mt-3 ml-11">
@@ -592,6 +576,7 @@ function CompletionDialog({ session, onClose, onComplete, isPending }: Completio
             <CheckCircle className="h-5 w-5 text-green-600" />
             Bake Complete!
           </DialogTitle>
+          <DialogDescription>Choose where to store the finished bagels</DialogDescription>
         </DialogHeader>
 
         <div className="py-4 space-y-4">
@@ -743,6 +728,7 @@ function QuantityDialog({ product, onConfirm, onClose }: QuantityDialogProps) {
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="font-serif">How many {product.name}?</DialogTitle>
+          <DialogDescription>Set the quantity for this batch</DialogDescription>
         </DialogHeader>
         <div className="py-6">
           <div className="flex items-center justify-center gap-4">
@@ -790,17 +776,13 @@ function QuantityDialog({ product, onConfirm, onClose }: QuantityDialogProps) {
 export default function AdminBake() {
   const { toast } = useToast();
   const [session, setSession] = useState<BakeSession | null>(loadSession);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantityProduct, setQuantityProduct] = useState<Product | null>(null);
+  const [recipeProduct, setRecipeProduct] = useState<Product | null>(null);
   const [showCompletion, setShowCompletion] = useState(false);
   const [scaledIngredients, setScaledIngredients] = useState<Array<{ name: string; quantity: number; unit: string }>>([]);
 
   const { data: products } = useQuery<Product[]>({
     queryKey: ["/api/admin/products"],
-  });
-
-  const { data: ingredients } = useQuery<Ingredient[]>({
-    queryKey: ["/api/admin/ingredients"],
   });
 
   const activeProducts = products?.filter((p) => p.isActive) || [];
@@ -869,23 +851,12 @@ export default function AdminBake() {
     },
   });
 
-  const handleSelectProduct = (product: Product) => {
-    if (selectedProduct?.id === product.id) {
-      setSelectedProduct(null);
-    } else {
-      setSelectedProduct(product);
-    }
+  const handleViewRecipe = (product: Product) => {
+    setRecipeProduct(product);
   };
 
-  const handleOvenClick = () => {
-    if (selectedProduct) {
-      setQuantityProduct(selectedProduct);
-    } else {
-      toast({
-        title: "Select a Bagel",
-        description: "Please select a bagel to bake first",
-      });
-    }
+  const handleBake = (product: Product) => {
+    setQuantityProduct(product);
   };
 
   const handleStartBake = (quantity: number) => {
@@ -914,7 +885,6 @@ export default function AdminBake() {
 
     setSession(newSession);
     setQuantityProduct(null);
-    setSelectedProduct(null);
     
     createBatchMutation.mutate({ productId: quantityProduct.id, quantity });
     
@@ -973,7 +943,7 @@ export default function AdminBake() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="font-serif text-3xl font-bold flex items-center gap-3">
             <ChefHat className="h-8 w-8" />
@@ -990,40 +960,42 @@ export default function AdminBake() {
       </div>
 
       {!session ? (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {displayProducts.length > 0 ? (
-              displayProducts.map((product) => (
-                <FlippableTile
-                  key={product.id}
-                  product={product}
-                  ingredients={ingredients || []}
-                  isSelected={selectedProduct?.id === product.id}
-                  onSelect={handleSelectProduct}
-                />
-              ))
-            ) : (
-              [1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="aspect-[16/9] rounded-xl border-2 border-dashed border-border flex items-center justify-center"
-                >
-                  <p className="text-muted-foreground text-sm text-center p-4">
-                    No products yet
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-
-          <OvenWidget selectedProduct={selectedProduct} onClick={handleOvenClick} />
-        </>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {displayProducts.length > 0 ? (
+            displayProducts.map((product) => (
+              <BagelCard
+                key={product.id}
+                product={product}
+                onViewRecipe={handleViewRecipe}
+                onBake={handleBake}
+              />
+            ))
+          ) : (
+            [1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="aspect-[16/9] rounded-xl border-2 border-dashed border-border flex items-center justify-center"
+              >
+                <p className="text-muted-foreground text-sm text-center p-4">
+                  No products yet
+                </p>
+              </div>
+            ))
+          )}
+        </div>
       ) : (
         <BakeChecklist
           session={session}
           onUpdateSession={handleUpdateSession}
           onComplete={handleComplete}
           scaledIngredients={scaledIngredients}
+        />
+      )}
+
+      {recipeProduct && (
+        <RecipeModal
+          product={recipeProduct}
+          onClose={() => setRecipeProduct(null)}
         />
       )}
 
