@@ -45,4 +45,4 @@ integrations = ["javascript_database:1.0.0", "javascript_log_in_with_replit:2.0.
 
 [userenv.shared]
 VITE_STRIPE_PUBLISHABLE_KEY = "pk_test_51StgpWLNxbMiXzlh2cNriU6l0pmmQyVaTSIdhIyADIelzlXMrKKFAFSyS39E4JeOTecTly2IDfAp3rtiuDm4ThvU00B4EsiJkj"
-"DATABASE _URL" = "DATABASE_URL=postgresql://postgres.ryxszimfhmftxchniqcc:vuhpox-sonve7-kysxAv@aws-1-us-east-2.pooler.supabase.com:6543/postgres"
+"DATABASE _URL" = "postgresql://postgres.ryxszimfhmftxchniqcc:vuhpox-sonve7-kysxAv@aws-1-us-east-2.pooler.supabase.com:6543/postgres"
