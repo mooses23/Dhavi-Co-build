@@ -55,11 +55,6 @@ export default function LandingPage() {
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   </Link>
-                  <Link href="/track">
-                    <Button variant="outline" size="lg" className="w-full sm:w-auto" data-testid="button-track-order">
-                      Track Order
-                    </Button>
-                  </Link>
                 </div>
               </div>
               <div className="relative">
@@ -114,10 +109,10 @@ export default function LandingPage() {
                 <div className="w-12 h-12 rounded-lg gold-gradient flex items-center justify-center mb-6">
                   <Truck className="h-6 w-6 text-black" />
                 </div>
-                <h3 className="font-serif text-xl font-semibold mb-3">Local Delivery</h3>
+                <h3 className="font-serif text-xl font-semibold mb-3">Wholesale & Bulk Orders</h3>
                 <p className="text-muted-foreground">
-                  Fresh bagels delivered right to your door.
-                  We bring our artisan creations directly to you.
+                  We partner with cafes, markets, and distributors.
+                  Bulk orders available for pickup at our location.
                 </p>
               </div>
             </div>
