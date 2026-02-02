@@ -27,7 +27,7 @@ async function seed() {
   console.log("");
 
   try {
-    // Seed Ingredients
+    // Seed Ingredients (keeping core bagel ingredients)
     console.log("📦 Seeding ingredients...");
     await sql`
       INSERT INTO ingredients (id, name, unit, on_hand, reorder_threshold, cost_per_unit)
@@ -41,9 +41,7 @@ async function seed() {
         ('ing-sesame', 'Sesame Seeds', 'oz', 12.00, 6.00, 0.45),
         ('ing-poppy', 'Poppy Seeds', 'oz', 8.00, 4.00, 0.55),
         ('ing-onion', 'Dried Onion Flakes', 'oz', 10.00, 5.00, 0.35),
-        ('ing-garlic', 'Dried Garlic', 'oz', 8.00, 4.00, 0.40),
-        ('ing-cinnamon', 'Ceylon Cinnamon', 'oz', 6.00, 3.00, 1.20),
-        ('ing-raisins', 'Golden Raisins', 'oz', 12.00, 6.00, 0.65)
+        ('ing-garlic', 'Dried Garlic', 'oz', 8.00, 4.00, 0.40)
       ON CONFLICT (id) DO UPDATE SET 
         name = EXCLUDED.name,
         unit = EXCLUDED.unit,
@@ -51,26 +49,31 @@ async function seed() {
         reorder_threshold = EXCLUDED.reorder_threshold,
         cost_per_unit = EXCLUDED.cost_per_unit
     `;
-    console.log("   ✓ 12 ingredients seeded");
+    console.log("   ✓ 10 ingredients seeded");
 
-    // Seed Products
+    // Delete old products that are no longer needed
+    console.log("🧹 Cleaning up old products...");
+    await sql`DELETE FROM freezer_stock WHERE product_id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
+    await sql`DELETE FROM bill_of_materials WHERE product_id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
+    await sql`DELETE FROM products WHERE id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
+    console.log("   ✓ Removed discontinued products");
+
+    // Seed Products (only 3 core products)
     console.log("🥯 Seeding products...");
     await sql`
-      INSERT INTO products (id, name, description, price, is_active)
+      INSERT INTO products (id, name, description, price, image_url, is_active)
       VALUES 
-        ('prod-plain', 'Plain Spelt Bagel', 'Classic spelt bagel with a perfect chewy texture', 3.50, true),
-        ('prod-everything', 'Everything Spelt Bagel', 'Topped with sesame, poppy, onion, garlic, and salt', 4.00, true),
-        ('prod-sesame', 'Sesame Spelt Bagel', 'Generously coated with toasted sesame seeds', 3.75, true),
-        ('prod-poppy', 'Poppy Seed Spelt Bagel', 'Classic poppy seed topping on spelt dough', 3.75, true),
-        ('prod-cinnamon', 'Cinnamon Raisin Spelt Bagel', 'Sweet cinnamon swirl with golden raisins', 4.25, true),
-        ('prod-onion', 'Onion Spelt Bagel', 'Savory dried onion topping', 3.75, true)
+        ('prod-plain', 'Plain Spelt Bagel', 'Classic spelt bagel with a perfect chewy texture', 3.50, '/images/bagel-plain.jpg', true),
+        ('prod-everything', 'Everything Spiced Bagel', 'Topped with sesame, poppy, onion, garlic, and salt', 4.00, '/images/bagel-everything.jpg', true),
+        ('prod-sesame', 'Sesame Spelt Bagel', 'Generously coated with toasted sesame seeds', 3.75, '/images/bagel-sesame.jpg', true)
       ON CONFLICT (id) DO UPDATE SET 
         name = EXCLUDED.name,
         description = EXCLUDED.description,
         price = EXCLUDED.price,
+        image_url = EXCLUDED.image_url,
         is_active = EXCLUDED.is_active
     `;
-    console.log("   ✓ 6 products seeded");
+    console.log("   ✓ 3 products seeded");
 
     // Seed Bill of Materials
     console.log("📋 Seeding bill of materials (recipes)...");
@@ -106,34 +109,9 @@ async function seed() {
         ('bom-sesame-salt', 'prod-sesame', 'ing-salt', 0.15),
         ('bom-sesame-honey', 'prod-sesame', 'ing-honey', 0.20),
         ('bom-sesame-malt', 'prod-sesame', 'ing-malt', 0.15),
-        ('bom-sesame-sesame', 'prod-sesame', 'ing-sesame', 0.25),
-        -- Poppy bagel
-        ('bom-poppy-flour', 'prod-poppy', 'ing-flour', 0.25),
-        ('bom-poppy-water', 'prod-poppy', 'ing-water', 0.03),
-        ('bom-poppy-yeast', 'prod-poppy', 'ing-yeast', 0.10),
-        ('bom-poppy-salt', 'prod-poppy', 'ing-salt', 0.15),
-        ('bom-poppy-honey', 'prod-poppy', 'ing-honey', 0.20),
-        ('bom-poppy-malt', 'prod-poppy', 'ing-malt', 0.15),
-        ('bom-poppy-poppy', 'prod-poppy', 'ing-poppy', 0.20),
-        -- Cinnamon Raisin bagel
-        ('bom-cinnamon-flour', 'prod-cinnamon', 'ing-flour', 0.25),
-        ('bom-cinnamon-water', 'prod-cinnamon', 'ing-water', 0.03),
-        ('bom-cinnamon-yeast', 'prod-cinnamon', 'ing-yeast', 0.10),
-        ('bom-cinnamon-salt', 'prod-cinnamon', 'ing-salt', 0.10),
-        ('bom-cinnamon-honey', 'prod-cinnamon', 'ing-honey', 0.30),
-        ('bom-cinnamon-malt', 'prod-cinnamon', 'ing-malt', 0.15),
-        ('bom-cinnamon-cinnamon', 'prod-cinnamon', 'ing-cinnamon', 0.15),
-        ('bom-cinnamon-raisins', 'prod-cinnamon', 'ing-raisins', 0.35),
-        -- Onion bagel
-        ('bom-onion-flour', 'prod-onion', 'ing-flour', 0.25),
-        ('bom-onion-water', 'prod-onion', 'ing-water', 0.03),
-        ('bom-onion-yeast', 'prod-onion', 'ing-yeast', 0.10),
-        ('bom-onion-salt', 'prod-onion', 'ing-salt', 0.15),
-        ('bom-onion-honey', 'prod-onion', 'ing-honey', 0.20),
-        ('bom-onion-malt', 'prod-onion', 'ing-malt', 0.15),
-        ('bom-onion-onion', 'prod-onion', 'ing-onion', 0.25)
+        ('bom-sesame-sesame', 'prod-sesame', 'ing-sesame', 0.25)
     `;
-    console.log("   ✓ 45 BOM entries seeded (recipes linked)");
+    console.log("   ✓ 23 BOM entries seeded (recipes linked)");
 
     // Seed Locations
     console.log("📍 Seeding locations...");
@@ -177,24 +155,21 @@ async function seed() {
         ('stock-plain-main', 'prod-plain', 'freezer-main', 24, 'Initial stock'),
         ('stock-everything-main', 'prod-everything', 'freezer-main', 18, 'Initial stock'),
         ('stock-sesame-main', 'prod-sesame', 'freezer-main', 12, 'Initial stock'),
-        ('stock-poppy-main', 'prod-poppy', 'freezer-main', 10, 'Initial stock'),
-        ('stock-cinnamon-main', 'prod-cinnamon', 'freezer-main', 15, 'Initial stock'),
-        ('stock-onion-main', 'prod-onion', 'freezer-main', 8, 'Initial stock'),
         ('stock-plain-backup', 'prod-plain', 'freezer-backup', 12, 'Backup stock'),
         ('stock-everything-backup', 'prod-everything', 'freezer-backup', 6, 'Backup stock')
     `;
-    console.log("   ✓ 8 freezer stock entries seeded");
+    console.log("   ✓ 5 freezer stock entries seeded");
 
     console.log("");
     console.log("✅ Seeding complete!");
     console.log("");
     console.log("Summary:");
-    console.log("  • 12 ingredients (Pantry)");
-    console.log("  • 6 bagel products");
-    console.log("  • 45 recipe entries (Bill of Materials)");
+    console.log("  • 10 ingredients (Pantry)");
+    console.log("  • 3 bagel products (Plain, Everything, Sesame)");
+    console.log("  • 23 recipe entries (Bill of Materials)");
     console.log("  • 3 locations");
     console.log("  • 3 freezers");
-    console.log("  • 8 freezer stock entries");
+    console.log("  • 5 freezer stock entries");
 
   } catch (error) {
     console.error("❌ Seeding failed:", error);
