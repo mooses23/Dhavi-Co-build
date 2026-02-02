@@ -59,9 +59,36 @@ export default function LandingPage() {
               </div>
               <div className="relative">
                 <div className="aspect-square rounded-2xl bg-gradient-to-br from-muted to-accent overflow-hidden ring-1 ring-border">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center space-y-4 p-8">
-                      <div className="w-32 h-32 mx-auto rounded-full gold-gradient opacity-20" />
+                  <div className="absolute inset-0">
+                    {/* Plain Bagel - top left */}
+                    <div className="absolute top-6 left-8 w-24 h-24 sm:w-28 sm:h-28">
+                      <div className="absolute inset-0 rounded-full gold-gradient opacity-40" />
+                      <img 
+                        src="/images/bagel-plain.jpg" 
+                        alt="Plain Spelt Bagel" 
+                        className="absolute inset-1 w-[calc(100%-8px)] h-[calc(100%-8px)] rounded-full object-cover"
+                      />
+                    </div>
+                    {/* Everything Bagel - top right */}
+                    <div className="absolute top-12 right-6 w-20 h-20 sm:w-24 sm:h-24">
+                      <div className="absolute inset-0 rounded-full gold-gradient opacity-40" />
+                      <img 
+                        src="/images/bagel-everything.jpg" 
+                        alt="Everything Spiced Bagel" 
+                        className="absolute inset-1 w-[calc(100%-8px)] h-[calc(100%-8px)] rounded-full object-cover"
+                      />
+                    </div>
+                    {/* Sesame Bagel - center bottom */}
+                    <div className="absolute bottom-16 left-1/2 -translate-x-1/2 w-28 h-28 sm:w-32 sm:h-32">
+                      <div className="absolute inset-0 rounded-full gold-gradient opacity-40" />
+                      <img 
+                        src="/images/bagel-sesame.jpg" 
+                        alt="Sesame Spelt Bagel" 
+                        className="absolute inset-1 w-[calc(100%-8px)] h-[calc(100%-8px)] rounded-full object-cover"
+                      />
+                    </div>
+                    {/* Fresh Daily text */}
+                    <div className="absolute bottom-4 left-0 right-0 text-center">
                       <p className="font-serif text-2xl text-muted-foreground">Fresh Daily</p>
                     </div>
                   </div>
