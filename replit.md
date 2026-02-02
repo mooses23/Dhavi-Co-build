@@ -173,8 +173,31 @@ shared/
 
 ## Development Commands
 - `npm run dev` - Start development server
-- `npm run db:push` - Push schema changes to database
+- `npm run db:push` - Push schema changes to Replit's development database
 - `npm run build` - Build for production
+
+## Syncing Schema to Supabase Production
+
+**Important:** Replit has its own built-in PostgreSQL for development. Running `npm run db:push` only updates the Replit database, NOT your Supabase production database.
+
+### Option 1: Import SQL File (Quick Setup)
+1. Open Supabase Dashboard → SQL Editor
+2. Copy contents of `supabase-schema.sql`
+3. Run the SQL to create all tables with seed data
+
+### Option 2: Push Schema Directly (Permanent Solution)
+1. Add `SUPABASE_DATABASE_URL` to your Replit secrets with your Supabase connection string (port 6543)
+2. Run: `npx tsx scripts/push-to-supabase.ts`
+
+Or run inline:
+```bash
+SUPABASE_DATABASE_URL='postgresql://postgres.xxx:password@aws-0-region.pooler.supabase.com:6543/postgres' npx tsx scripts/push-to-supabase.ts
+```
+
+### Database Driver Notes
+- Uses `postgres-js` driver with `prepare: false` for Supabase Transaction Pooler compatibility
+- Session storage uses separate `pg` pool (required by connect-pg-simple)
+- Always use port 6543 (Transaction Pooler) for serverless/Vercel deployments
 
 ## Environment Variables
 - `DATABASE_URL` - PostgreSQL connection string
