@@ -51,10 +51,23 @@ async function seed() {
     `;
     console.log("   ✓ 10 ingredients seeded");
 
-    // Delete old products that are no longer needed
+    // Delete old products that are no longer needed (cascade through all related tables)
     console.log("🧹 Cleaning up old products...");
+    const oldProductIds = ['prod-poppy', 'prod-cinnamon', 'prod-onion'];
+    
+    // Delete from batch_items first (references batches and products)
+    await sql`DELETE FROM batch_items WHERE product_id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
+    
+    // Delete from order_items (references orders and products)
+    await sql`DELETE FROM order_items WHERE product_id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
+    
+    // Delete from freezer_stock
     await sql`DELETE FROM freezer_stock WHERE product_id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
+    
+    // Delete from bill_of_materials
     await sql`DELETE FROM bill_of_materials WHERE product_id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
+    
+    // Finally delete the products themselves
     await sql`DELETE FROM products WHERE id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
     console.log("   ✓ Removed discontinued products");
 
