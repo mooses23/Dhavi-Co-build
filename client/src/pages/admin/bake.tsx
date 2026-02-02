@@ -14,11 +14,11 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Timer, Play, Pause, RotateCcw, CheckCircle, ChefHat, 
   Snowflake, Package, Flame, Clock, StickyNote,
-  ThermometerSun, Volume2
+  ThermometerSun, Volume2, Check
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Product, Ingredient, BillOfMaterial, Order } from "@shared/schema";
-import ovenHeroImage from "../../assets/images/oven-hero.jpg";
+import ovenHeroImage from "../../assets/images/oven-fire.jpg";
 import bagelTileImage from "../../assets/images/bagel-tile.jpg";
 
 const BAKE_STEPS = [
@@ -71,10 +71,11 @@ function saveSession(session: BakeSession | null) {
 interface FlippableTileProps {
   product: Product;
   ingredients: Ingredient[];
-  onDragStart: (product: Product) => void;
+  isSelected: boolean;
+  onSelect: (product: Product) => void;
 }
 
-function FlippableTile({ product, ingredients, onDragStart }: FlippableTileProps) {
+function FlippableTile({ product, ingredients, isSelected, onSelect }: FlippableTileProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   
   const { data: bom } = useQuery<(BillOfMaterial & { ingredient: Ingredient })[]>({
@@ -88,18 +89,24 @@ function FlippableTile({ product, ingredients, onDragStart }: FlippableTileProps
     },
   });
 
-  const handleDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData("product", JSON.stringify(product));
-    onDragStart(product);
+  const handleFrontClick = () => {
+    setIsFlipped(true);
+  };
+
+  const handleSelectClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onSelect(product);
+  };
+
+  const handleFlipBack = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsFlipped(false);
   };
 
   return (
     <div
-      className="relative w-full aspect-square cursor-grab active:cursor-grabbing perspective-1000"
+      className="relative w-full aspect-[16/9] cursor-pointer perspective-1000"
       style={{ perspective: "1000px" }}
-      onClick={() => setIsFlipped(!isFlipped)}
-      draggable
-      onDragStart={handleDragStart}
       data-testid={`tile-${product.id}`}
     >
       <div
@@ -110,44 +117,83 @@ function FlippableTile({ product, ingredients, onDragStart }: FlippableTileProps
         }}
       >
         <div
-          className="absolute inset-0 rounded-xl overflow-hidden border-2 border-border shadow-lg backface-hidden"
+          className={`absolute inset-0 rounded-xl overflow-hidden border-2 shadow-lg backface-hidden transition-all ${
+            isSelected ? "border-primary ring-2 ring-primary/30" : "border-border"
+          }`}
           style={{ backfaceVisibility: "hidden" }}
+          onClick={handleFrontClick}
         >
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent z-10" />
           <img
             src={product.imageUrl || bagelTileImage}
             alt={product.name}
             className="w-full h-full object-cover"
           />
-          <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
-            <h3 className="text-white font-serif text-xl font-bold">{product.name}</h3>
-            <p className="text-white/80 text-sm mt-1">Tap to see recipe</p>
+          <div className="absolute bottom-0 left-0 right-0 p-5 z-20">
+            <h3 className="text-white font-serif text-2xl font-bold">{product.name}</h3>
+            <p className="text-white/80 text-base mt-1">Tap to see recipe</p>
           </div>
+          {isSelected && (
+            <div className="absolute top-3 right-3 z-20">
+              <Badge className="bg-primary text-primary-foreground">
+                <Check className="h-3 w-3 mr-1" />
+                Selected
+              </Badge>
+            </div>
+          )}
         </div>
         
         <div
-          className="absolute inset-0 rounded-xl bg-card border-2 border-border shadow-lg p-4 overflow-auto backface-hidden"
+          className={`absolute inset-0 rounded-xl bg-card border-2 shadow-lg p-5 overflow-auto backface-hidden transition-all ${
+            isSelected ? "border-primary ring-2 ring-primary/30" : "border-border"
+          }`}
           style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
         >
-          <h3 className="font-serif text-lg font-bold mb-3">{product.name} Recipe</h3>
+          <h3 className="font-serif text-xl font-bold mb-4">{product.name} Recipe</h3>
           {bom && bom.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-2 mb-4">
               {bom.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between text-sm py-1 border-b border-border/50 last:border-0"
+                  className="flex items-center justify-between text-base py-1.5 border-b border-border/50 last:border-0"
                 >
-                  <span>{item.ingredient.name}</span>
-                  <Badge variant="secondary" className="text-xs">
+                  <span className="font-medium">{item.ingredient.name}</span>
+                  <Badge variant="secondary" className="text-sm">
                     {parseFloat(item.quantity).toFixed(2)} {item.ingredient.unit}
                   </Badge>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">No ingredients defined</p>
+            <p className="text-muted-foreground text-base mb-4">No ingredients defined</p>
           )}
-          <p className="text-muted-foreground text-xs mt-4">Tap to flip back</p>
+          <div className="flex gap-2 mt-auto pt-4 border-t border-border">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={handleFlipBack}
+              data-testid={`button-flip-back-${product.id}`}
+            >
+              Flip Back
+            </Button>
+            <Button
+              className={`flex-1 ${isSelected ? "bg-primary/80" : ""}`}
+              onClick={handleSelectClick}
+              data-testid={`button-select-${product.id}`}
+            >
+              {isSelected ? (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Selected
+                </>
+              ) : (
+                <>
+                  <Flame className="h-4 w-4 mr-2" />
+                  Select for Baking
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -155,45 +201,21 @@ function FlippableTile({ product, ingredients, onDragStart }: FlippableTileProps
 }
 
 interface OvenWidgetProps {
-  onDrop: (product: Product) => void;
-  isDragging: boolean;
+  selectedProduct: Product | null;
+  onClick: () => void;
 }
 
-function OvenWidget({ onDrop, isDragging }: OvenWidgetProps) {
-  const [isOver, setIsOver] = useState(false);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsOver(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsOver(false);
-    try {
-      const product = JSON.parse(e.dataTransfer.getData("product"));
-      onDrop(product);
-    } catch (err) {
-      console.error("Failed to parse dropped product", err);
-    }
-  };
+function OvenWidget({ selectedProduct, onClick }: OvenWidgetProps) {
+  const hasSelection = !!selectedProduct;
 
   return (
     <div
-      className={`relative w-full h-48 md:h-64 rounded-xl overflow-hidden border-2 transition-all duration-300 ${
-        isOver
-          ? "border-primary shadow-lg shadow-primary/20 scale-[1.02]"
-          : isDragging
-          ? "border-primary/50 border-dashed"
-          : "border-border"
+      className={`relative w-full h-48 md:h-64 rounded-xl overflow-hidden border-2 transition-all duration-300 cursor-pointer ${
+        hasSelection
+          ? "border-primary shadow-lg shadow-primary/20 hover:scale-[1.01]"
+          : "border-border hover:border-primary/50"
       }`}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      onClick={onClick}
       data-testid="oven-widget"
     >
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20 z-10" />
@@ -203,12 +225,12 @@ function OvenWidget({ onDrop, isDragging }: OvenWidgetProps) {
         className="w-full h-full object-cover"
       />
       <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
-        <Flame className={`h-12 w-12 mb-3 transition-all ${isOver ? "text-orange-400 scale-110" : "text-white/80"}`} />
+        <Flame className={`h-12 w-12 mb-3 transition-all ${hasSelection ? "text-orange-400 animate-pulse" : "text-white/80"}`} />
         <h2 className="text-white font-serif text-2xl md:text-3xl font-bold text-center">
-          {isOver ? "Drop to Start!" : "Start Bake"}
+          {hasSelection ? `Bake ${selectedProduct.name}` : "Start Bake"}
         </h2>
         <p className="text-white/70 text-sm mt-2">
-          {isDragging ? "Drop bagel here to begin" : "Drag a bagel tile here"}
+          {hasSelection ? "Click to set quantity and begin" : "Select a bagel above first"}
         </p>
       </div>
     </div>
@@ -642,8 +664,8 @@ function CompletionDialog({ session, onClose, onComplete, isPending }: Completio
             >
               <div className="flex items-center gap-3">
                 <div className="flex">
-                  <Snowflake className="h-4 w-4 text-blue-500" />
-                  <Package className="h-4 w-4 text-orange-500 -ml-1" />
+                  <Snowflake className="h-5 w-5 text-blue-500 -mr-1" />
+                  <Package className="h-5 w-5 text-orange-500" />
                 </div>
                 <div>
                   <span className="font-medium">Split</span>
@@ -652,10 +674,8 @@ function CompletionDialog({ session, onClose, onComplete, isPending }: Completio
               </div>
               {destination === "split" && (
                 <div className="mt-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm flex items-center gap-2">
-                      <Snowflake className="h-4 w-4 text-blue-500" /> Freezer
-                    </span>
+                  <div className="flex items-center gap-3">
+                    <Snowflake className="h-4 w-4 text-blue-500" />
                     <Input
                       type="number"
                       min={0}
@@ -665,14 +685,14 @@ function CompletionDialog({ session, onClose, onComplete, isPending }: Completio
                       className="w-20"
                       data-testid="input-freezer-qty"
                     />
+                    <span className="text-sm text-muted-foreground">to freezer</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm flex items-center gap-2">
-                      <Package className="h-4 w-4 text-orange-500" /> Order
-                    </span>
-                    <Badge variant="secondary">{orderQty}</Badge>
+                  <div className="flex items-center gap-3">
+                    <Package className="h-4 w-4 text-orange-500" />
+                    <span className="w-20 text-center font-medium">{orderQty}</span>
+                    <span className="text-sm text-muted-foreground">to order</span>
                   </div>
-                  {orderQty > 0 && pendingOrders.length > 0 && (
+                  {orderQty > 0 && (
                     <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
                       <SelectTrigger data-testid="select-split-order">
                         <SelectValue placeholder="Select order..." />
@@ -770,7 +790,7 @@ function QuantityDialog({ product, onConfirm, onClose }: QuantityDialogProps) {
 export default function AdminBake() {
   const { toast } = useToast();
   const [session, setSession] = useState<BakeSession | null>(loadSession);
-  const [isDragging, setIsDragging] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantityProduct, setQuantityProduct] = useState<Product | null>(null);
   const [showCompletion, setShowCompletion] = useState(false);
   const [scaledIngredients, setScaledIngredients] = useState<Array<{ name: string; quantity: number; unit: string }>>([]);
@@ -849,9 +869,23 @@ export default function AdminBake() {
     },
   });
 
-  const handleDrop = (product: Product) => {
-    setIsDragging(false);
-    setQuantityProduct(product);
+  const handleSelectProduct = (product: Product) => {
+    if (selectedProduct?.id === product.id) {
+      setSelectedProduct(null);
+    } else {
+      setSelectedProduct(product);
+    }
+  };
+
+  const handleOvenClick = () => {
+    if (selectedProduct) {
+      setQuantityProduct(selectedProduct);
+    } else {
+      toast({
+        title: "Select a Bagel",
+        description: "Please select a bagel to bake first",
+      });
+    }
   };
 
   const handleStartBake = (quantity: number) => {
@@ -880,6 +914,7 @@ export default function AdminBake() {
 
     setSession(newSession);
     setQuantityProduct(null);
+    setSelectedProduct(null);
     
     createBatchMutation.mutate({ productId: quantityProduct.id, quantity });
     
@@ -956,21 +991,22 @@ export default function AdminBake() {
 
       {!session ? (
         <>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {displayProducts.length > 0 ? (
               displayProducts.map((product) => (
                 <FlippableTile
                   key={product.id}
                   product={product}
                   ingredients={ingredients || []}
-                  onDragStart={() => setIsDragging(true)}
+                  isSelected={selectedProduct?.id === product.id}
+                  onSelect={handleSelectProduct}
                 />
               ))
             ) : (
               [1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="aspect-square rounded-xl border-2 border-dashed border-border flex items-center justify-center"
+                  className="aspect-[16/9] rounded-xl border-2 border-dashed border-border flex items-center justify-center"
                 >
                   <p className="text-muted-foreground text-sm text-center p-4">
                     No products yet
@@ -980,7 +1016,7 @@ export default function AdminBake() {
             )}
           </div>
 
-          <OvenWidget onDrop={handleDrop} isDragging={isDragging} />
+          <OvenWidget selectedProduct={selectedProduct} onClick={handleOvenClick} />
         </>
       ) : (
         <BakeChecklist
