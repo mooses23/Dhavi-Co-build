@@ -58,53 +58,24 @@ export default function LandingPage() {
                 </div>
               </div>
               <div className="relative">
-                <div className="aspect-square rounded-2xl bg-zinc-950 overflow-hidden ring-1 ring-zinc-800">
-                  <div className="absolute inset-0 flex flex-col">
-                    {/* Top branding */}
-                    <div className="pt-6 sm:pt-8 text-center">
-                      <p className="text-xs sm:text-sm tracking-[0.3em] text-zinc-400 uppercase">
-                        D'havi<span className="text-gold">.</span> · Spelt Bagels
-                      </p>
-                    </div>
-                    
-                    {/* Fresh. Daily. headline */}
-                    <div className="mt-2 sm:mt-4 text-center">
-                      <h3 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight">
-                        Fresh<span className="text-gold">.</span> Daily<span className="text-gold">.</span>
-                      </h3>
-                    </div>
-                    
-                    {/* Three bagels - horizontally arranged, overlapping */}
-                    <div className="flex-1 relative flex items-center justify-center">
-                      {/* Plain Bagel - left */}
-                      <img 
-                        src="/images/bagel-plain.jpg" 
-                        alt="Plain Spelt Bagel"
-                        data-testid="img-bagel-plain"
-                        className="absolute w-24 h-24 sm:w-32 sm:h-32 lg:w-36 lg:h-36 rounded-full object-cover shadow-2xl -translate-x-[70%] translate-y-2 z-10"
-                      />
-                      {/* Sesame Bagel - center (front) */}
-                      <img 
-                        src="/images/bagel-sesame.jpg" 
-                        alt="Sesame Spelt Bagel"
-                        data-testid="img-bagel-sesame"
-                        className="absolute w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 rounded-full object-cover shadow-2xl z-20"
-                      />
-                      {/* Everything Bagel - right */}
-                      <img 
-                        src="/images/bagel-everything.jpg" 
-                        alt="Everything Spiced Bagel"
-                        data-testid="img-bagel-everything"
-                        className="absolute w-24 h-24 sm:w-32 sm:h-32 lg:w-36 lg:h-36 rounded-full object-cover shadow-2xl translate-x-[70%] translate-y-2 z-10"
-                      />
-                    </div>
-                    
-                    {/* Tagline */}
-                    <div className="pb-6 sm:pb-8 text-center">
-                      <p className="text-xs sm:text-sm text-zinc-500">
-                        Small-batch. Old-world method.
-                      </p>
-                    </div>
+                <div className="aspect-square rounded-2xl overflow-hidden ring-1 ring-zinc-800 shadow-2xl relative">
+                  {/* Hero background image */}
+                  <img 
+                    src="/images/hero-bakery.png" 
+                    alt="Artisan bagel making - hands kneading dough with fresh bagels"
+                    data-testid="img-hero-bakery"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  {/* Subtle dark overlay for text readability */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
+                  {/* Fresh. Daily. text overlay */}
+                  <div className="absolute top-6 sm:top-10 left-0 right-0 text-center">
+                    <h3 
+                      className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight italic drop-shadow-lg"
+                      data-testid="text-hero-fresh-daily"
+                    >
+                      Fresh. Daily.
+                    </h3>
                   </div>
                 </div>
               </div>
