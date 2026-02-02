@@ -1,6 +1,25 @@
+import { useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Minus, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator 
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Minus, Plus, MoreVertical, Pencil, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FreezerStock {
@@ -20,10 +39,50 @@ interface FreezerDoorProps {
   isOpen: boolean;
   onToggle: () => void;
   onUpdateStock: (productId: string, quantity: number) => void;
+  onRename?: (newName: string) => void;
+  onDelete?: () => void;
+  onClose?: () => void;
 }
 
-export function FreezerDoor({ freezer, isOpen, onToggle, onUpdateStock }: FreezerDoorProps) {
+export function FreezerDoor({ 
+  freezer, 
+  isOpen, 
+  onToggle, 
+  onUpdateStock,
+  onRename,
+  onDelete,
+  onClose
+}: FreezerDoorProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(freezer.name);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
   const totalItems = freezer.stock.reduce((sum, item) => sum + item.quantity, 0);
+
+  const handleRename = () => {
+    if (editName.trim() && onRename) {
+      onRename(editName.trim());
+      setIsEditing(false);
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleRename();
+    } else if (e.key === "Escape") {
+      setEditName(freezer.name);
+      setIsEditing(false);
+    }
+  };
+
+  const handleBlur = () => {
+    if (editName.trim()) {
+      handleRename();
+    } else {
+      setEditName(freezer.name);
+      setIsEditing(false);
+    }
+  };
 
   return (
     <div className="flex flex-col" data-testid={`freezer-container-${freezer.id}`}>
@@ -109,13 +168,110 @@ export function FreezerDoor({ freezer, isOpen, onToggle, onUpdateStock }: Freeze
             </span>
           </div>
         </div>
+
+        {isOpen && onClose && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-2 right-2 h-8 w-8 bg-white/80 dark:bg-zinc-800/80 hover:bg-white dark:hover:bg-zinc-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            data-testid={`button-close-door-${freezer.id}`}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
-      <div className="mt-2 text-center">
-        <span className="text-sm font-medium text-muted-foreground" data-testid={`freezer-name-${freezer.id}`}>
-          {freezer.name}
-        </span>
+      <div className="mt-2 flex items-center justify-center gap-2">
+        {isEditing ? (
+          <div className="flex items-center gap-1">
+            <Input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={handleBlur}
+              className="h-7 text-sm text-center w-32"
+              autoFocus
+              data-testid={`input-rename-${freezer.id}`}
+            />
+          </div>
+        ) : (
+          <>
+            <span className="text-sm font-medium text-muted-foreground" data-testid={`freezer-name-${freezer.id}`}>
+              {freezer.name}
+            </span>
+            {(onRename || onDelete) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6"
+                    data-testid={`button-freezer-menu-${freezer.id}`}
+                  >
+                    <MoreVertical className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center">
+                  {onRename && (
+                    <DropdownMenuItem 
+                      onClick={() => setIsEditing(true)}
+                      data-testid={`menu-rename-${freezer.id}`}
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Rename
+                    </DropdownMenuItem>
+                  )}
+                  {onDelete && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => setDeleteDialogOpen(true)}
+                        className="text-destructive focus:text-destructive"
+                        data-testid={`menu-delete-${freezer.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </>
+        )}
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Freezer</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{freezer.name}"? 
+              {totalItems > 0 && " This freezer still has items in it."}
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid={`button-cancel-delete-${freezer.id}`}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onDelete?.();
+                setDeleteDialogOpen(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid={`button-confirm-delete-${freezer.id}`}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

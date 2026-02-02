@@ -65,6 +65,32 @@ export default function AdminFreezer() {
     },
   });
 
+  const renameFreezerMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      return await apiRequest("PATCH", `/api/admin/freezers/${id}`, { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/freezers"] });
+      toast({ title: "Freezer Renamed", description: "Freezer name has been updated." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteFreezerMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/admin/freezers/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/freezers"] });
+      toast({ title: "Freezer Deleted", description: "Freezer has been removed." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const updateStockMutation = useMutation({
     mutationFn: async ({ freezerId, productId, quantity }: { freezerId: string; productId: string; quantity: number }) => {
       return await apiRequest("PATCH", `/api/admin/freezers/${freezerId}/stock/${productId}`, { quantity });
@@ -101,6 +127,14 @@ export default function AdminFreezer() {
     });
   };
 
+  const closeDoor = (freezerId: string) => {
+    setOpenDoors((prev) => {
+      const next = new Set(prev);
+      next.delete(freezerId);
+      return next;
+    });
+  };
+
   const handleUpdateStock = (freezerId: string, productId: string, quantity: number) => {
     const freezer = freezersData?.freezers.find(f => f.id === freezerId);
     const existingStock = freezer?.stock.find(s => s.productId === productId);
@@ -110,6 +144,15 @@ export default function AdminFreezer() {
     } else {
       addStockMutation.mutate({ freezerId, productId, quantity });
     }
+  };
+
+  const handleRenameFreezer = (freezerId: string, newName: string) => {
+    renameFreezerMutation.mutate({ id: freezerId, name: newName });
+  };
+
+  const handleDeleteFreezer = (freezerId: string) => {
+    deleteFreezerMutation.mutate(freezerId);
+    closeDoor(freezerId);
   };
 
   const handleCreateFreezer = () => {
@@ -141,7 +184,7 @@ export default function AdminFreezer() {
           <h1 className="font-serif text-3xl font-bold" data-testid="text-freezer-heading">
             Freezer Storage
           </h1>
-                    <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1">
             Manage bagel inventory across freezer units
           </p>
         </div>
@@ -195,6 +238,9 @@ export default function AdminFreezer() {
               isOpen={openDoors.has(freezer.id)}
               onToggle={() => toggleDoor(freezer.id)}
               onUpdateStock={(productId, quantity) => handleUpdateStock(freezer.id, productId, quantity)}
+              onRename={(newName) => handleRenameFreezer(freezer.id, newName)}
+              onDelete={() => handleDeleteFreezer(freezer.id)}
+              onClose={() => closeDoor(freezer.id)}
             />
           ))}
         </div>
