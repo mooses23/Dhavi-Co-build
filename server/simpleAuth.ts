@@ -1,7 +1,10 @@
 import type { Express, RequestHandler } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { getPool } from "./db.js";
+import pg from "pg";
+import { getSql } from "./db.js";
+
+const { Pool } = pg;
 
 const VALID_USERNAME = "Dhavi.co";
 const VALID_PASSWORD = "SpeltBagels";
@@ -21,43 +24,54 @@ declare module "express-session" {
   }
 }
 
+let _sessionPool: pg.Pool | null = null;
+
+function getSessionPool(): pg.Pool {
+  if (!_sessionPool) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL must be set");
+    }
+    _sessionPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+      max: 2,
+      idleTimeoutMillis: 20000,
+      connectionTimeoutMillis: 10000,
+    });
+  }
+  return _sessionPool;
+}
+
 export async function setupSimpleAuth(app: Express) {
   app.set("trust proxy", 1);
   
-  // Test database connection and ensure session table exists before setting up session store
-  const pool = getPool();
   try {
-    await pool.query("SELECT 1");
+    await getSql()`SELECT 1`;
     console.log("Database connection successful");
     
-    // Ensure session table exists with proper structure
-    // Using "sessions" to match the schema in shared/models/auth.ts
-    await pool.query(`
+    await getSql()`
       CREATE TABLE IF NOT EXISTS "sessions" (
         "sid" varchar NOT NULL COLLATE "default",
         "sess" json NOT NULL,
         "expire" timestamp(6) NOT NULL,
         CONSTRAINT "sessions_pkey" PRIMARY KEY ("sid")
       )
-    `);
+    `;
     
-    // Create index on expire column for faster session pruning
-    await pool.query(`
+    await getSql()`
       CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "sessions" ("expire")
-    `);
+    `;
     
     console.log("Session table ready");
   } catch (error) {
     console.error("Database setup error:", error);
-    throw error; // Fail fast if database setup fails
+    throw error;
   }
   
   const sessionStore = new PgSession({
-    pool: pool,
+    pool: getSessionPool(),
     tableName: "sessions",
-    // Disable auto table creation since we create it manually above
     createTableIfMissing: false,
-    // Enable session pruning to clean up expired sessions (every 15 minutes)
     pruneSessionInterval: 900,
     errorLog: (error) => {
       console.error("Session store error:", error);
@@ -96,7 +110,6 @@ export function registerSimpleAuthRoutes(app: Express) {
         return res.status(400).json({ message: "Username and password are required" });
       }
 
-      // Debug: Check what's being compared
       console.log("Username match:", username === VALID_USERNAME);
       console.log("Password match:", password === VALID_PASSWORD);
       console.log("Expected username:", VALID_USERNAME);
@@ -129,7 +142,6 @@ export function registerSimpleAuthRoutes(app: Express) {
           });
         } catch (sessionError) {
           console.error("Session error during login:", sessionError);
-          // Return generic error message without exposing internal details
           return res.status(500).json({ 
             message: "Failed to create session. Please try again or contact support."
           });
@@ -140,7 +152,6 @@ export function registerSimpleAuthRoutes(app: Express) {
       return res.status(401).json({ message: "Invalid username or password" });
     } catch (error) {
       console.error("Login error (caught at top level):", error);
-      // Return generic error message in production, detailed in development
       const message = process.env.NODE_ENV === "development" && error instanceof Error
         ? error.message
         : "Login failed. Please try again.";
@@ -165,7 +176,6 @@ export function registerSimpleAuthRoutes(app: Express) {
       if (err) {
         return res.status(500).json({ message: "Failed to logout" });
       }
-      // Clear the correct cookie name that matches the session config
       res.clearCookie("dhavi.sid", {
         path: "/",
         httpOnly: true,

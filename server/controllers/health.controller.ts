@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
-import { getPool } from "../db.js";
+import { getSql } from "../db.js";
 
 export async function healthCheck(req: Request, res: Response) {
   try {
-    await getPool().query("SELECT 1");
+    await getSql()`SELECT 1`;
     
     res.json({
       status: "ok",
