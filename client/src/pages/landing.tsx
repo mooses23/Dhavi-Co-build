@@ -58,43 +58,55 @@ export default function LandingPage() {
                 </div>
               </div>
               <div className="relative">
-                <div className="aspect-square rounded-2xl bg-gradient-to-br from-muted to-accent overflow-hidden ring-1 ring-border">
-                  <div className="absolute inset-0">
-                    {/* Plain Bagel - top left */}
-                    <div className="absolute top-6 left-8 w-24 h-24 sm:w-28 sm:h-28">
-                      <div className="absolute inset-0 rounded-full gold-gradient opacity-40" />
+                <div className="aspect-square rounded-2xl bg-zinc-950 overflow-hidden ring-1 ring-zinc-800">
+                  <div className="absolute inset-0 flex flex-col">
+                    {/* Top branding */}
+                    <div className="pt-6 sm:pt-8 text-center">
+                      <p className="text-xs sm:text-sm tracking-[0.3em] text-zinc-400 uppercase">
+                        D'havi<span className="text-gold">.</span> · Spelt Bagels
+                      </p>
+                    </div>
+                    
+                    {/* Fresh. Daily. headline */}
+                    <div className="mt-2 sm:mt-4 text-center">
+                      <h3 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight">
+                        Fresh<span className="text-gold">.</span> Daily<span className="text-gold">.</span>
+                      </h3>
+                    </div>
+                    
+                    {/* Three bagels - horizontally arranged, overlapping */}
+                    <div className="flex-1 relative flex items-center justify-center">
+                      {/* Plain Bagel - left */}
                       <img 
                         src="/images/bagel-plain.jpg" 
-                        alt="Plain Spelt Bagel" 
-                        className="absolute inset-1 w-[calc(100%-8px)] h-[calc(100%-8px)] rounded-full object-cover"
+                        alt="Plain Spelt Bagel"
+                        data-testid="img-bagel-plain"
+                        className="absolute w-24 h-24 sm:w-32 sm:h-32 lg:w-36 lg:h-36 rounded-full object-cover shadow-2xl -translate-x-[70%] translate-y-2 z-10"
                       />
-                    </div>
-                    {/* Everything Bagel - top right */}
-                    <div className="absolute top-12 right-6 w-20 h-20 sm:w-24 sm:h-24">
-                      <div className="absolute inset-0 rounded-full gold-gradient opacity-40" />
-                      <img 
-                        src="/images/bagel-everything.jpg" 
-                        alt="Everything Spiced Bagel" 
-                        className="absolute inset-1 w-[calc(100%-8px)] h-[calc(100%-8px)] rounded-full object-cover"
-                      />
-                    </div>
-                    {/* Sesame Bagel - center bottom */}
-                    <div className="absolute bottom-16 left-1/2 -translate-x-1/2 w-28 h-28 sm:w-32 sm:h-32">
-                      <div className="absolute inset-0 rounded-full gold-gradient opacity-40" />
+                      {/* Sesame Bagel - center (front) */}
                       <img 
                         src="/images/bagel-sesame.jpg" 
-                        alt="Sesame Spelt Bagel" 
-                        className="absolute inset-1 w-[calc(100%-8px)] h-[calc(100%-8px)] rounded-full object-cover"
+                        alt="Sesame Spelt Bagel"
+                        data-testid="img-bagel-sesame"
+                        className="absolute w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 rounded-full object-cover shadow-2xl z-20"
+                      />
+                      {/* Everything Bagel - right */}
+                      <img 
+                        src="/images/bagel-everything.jpg" 
+                        alt="Everything Spiced Bagel"
+                        data-testid="img-bagel-everything"
+                        className="absolute w-24 h-24 sm:w-32 sm:h-32 lg:w-36 lg:h-36 rounded-full object-cover shadow-2xl translate-x-[70%] translate-y-2 z-10"
                       />
                     </div>
-                    {/* Fresh Daily text */}
-                    <div className="absolute bottom-4 left-0 right-0 text-center">
-                      <p className="font-serif text-2xl text-muted-foreground">Fresh Daily</p>
+                    
+                    {/* Tagline */}
+                    <div className="pb-6 sm:pb-8 text-center">
+                      <p className="text-xs sm:text-sm text-zinc-500">
+                        Small-batch. Old-world method.
+                      </p>
                     </div>
                   </div>
                 </div>
-                <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-xl gold-gradient opacity-10 blur-xl" />
-                <div className="absolute -top-6 -right-6 w-32 h-32 rounded-xl gold-gradient opacity-10 blur-xl" />
               </div>
             </div>
           </div>
