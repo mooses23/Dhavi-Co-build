@@ -51,25 +51,29 @@ async function seed() {
     `;
     console.log("   ✓ 10 ingredients seeded");
 
-    // Delete old products that are no longer needed (cascade through all related tables)
-    console.log("🧹 Cleaning up old products...");
-    const oldProductIds = ['prod-poppy', 'prod-cinnamon', 'prod-onion'];
+    // Delete ALL products that are not in our approved list (cascade through all related tables)
+    const keepProductIds = ['prod-plain', 'prod-everything', 'prod-sesame'];
+    console.log("🧹 Cleaning up ALL old/orphaned products...");
     
     // Delete from batch_items first (references batches and products)
-    await sql`DELETE FROM batch_items WHERE product_id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
+    await sql`DELETE FROM batch_items WHERE product_id NOT IN ('prod-plain', 'prod-everything', 'prod-sesame')`;
+    console.log("   ✓ Cleaned batch_items");
     
     // Delete from order_items (references orders and products)
-    await sql`DELETE FROM order_items WHERE product_id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
+    await sql`DELETE FROM order_items WHERE product_id NOT IN ('prod-plain', 'prod-everything', 'prod-sesame')`;
+    console.log("   ✓ Cleaned order_items");
     
-    // Delete from freezer_stock
-    await sql`DELETE FROM freezer_stock WHERE product_id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
+    // Delete from freezer_stock (keep only stock with valid product IDs)
+    await sql`DELETE FROM freezer_stock WHERE product_id NOT IN ('prod-plain', 'prod-everything', 'prod-sesame')`;
+    console.log("   ✓ Cleaned freezer_stock");
     
     // Delete from bill_of_materials
-    await sql`DELETE FROM bill_of_materials WHERE product_id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
+    await sql`DELETE FROM bill_of_materials WHERE product_id NOT IN ('prod-plain', 'prod-everything', 'prod-sesame')`;
+    console.log("   ✓ Cleaned bill_of_materials");
     
-    // Finally delete the products themselves
-    await sql`DELETE FROM products WHERE id IN ('prod-poppy', 'prod-cinnamon', 'prod-onion')`;
-    console.log("   ✓ Removed discontinued products");
+    // Finally delete ALL products that are not in our keep list
+    await sql`DELETE FROM products WHERE id NOT IN ('prod-plain', 'prod-everything', 'prod-sesame')`;
+    console.log("   ✓ Removed all old/duplicate products");
 
     // Seed Products (only 3 core products)
     console.log("🥯 Seeding products...");
