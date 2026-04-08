@@ -69,6 +69,19 @@ const loginRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many login attempts. Please try again in 15 minutes." },
   skipSuccessfulRequests: true,
+  handler: (req, res) => {
+    const username = req.body?.username ?? "(unknown)";
+    console.warn(`Login rate limit exceeded for username: "${username}" from IP: ${req.ip}`);
+    storage.logActivity(
+      "auth.login_rate_limited",
+      "auth",
+      undefined,
+      { username, ip: req.ip, userAgent: req.headers["user-agent"] ?? null },
+      undefined,
+      "system"
+    ).catch((err) => console.error("Failed to log rate-limit event:", err));
+    res.status(429).json({ message: "Too many login attempts. Please try again in 15 minutes." });
+  },
 });
 
 export async function registerRoutes(
@@ -241,9 +254,15 @@ export async function registerRoutes(
       return res.status(400).send("Webhook Error: Webhook secret not configured.");
     }
 
+    const rawBody = req.rawBody as Buffer | undefined;
+    if (!rawBody) {
+      console.error("Stripe webhook: raw body not available for signature verification.");
+      return res.status(400).send("Webhook Error: Raw body unavailable.");
+    }
+
     try {
       const event = getStripe().webhooks.constructEvent(
-        req.body,
+        rawBody,
         sig as string,
         webhookSecret
       );
