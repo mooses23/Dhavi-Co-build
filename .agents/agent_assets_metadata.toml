@@ -1,8 +1,37 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "Hu52o3929dChl12oPDz2C"
 uri = "file://client/public/images/hero-bakery.png"
 type = "image"
 title = "generated_image"
+
+[[outputs]]
+id = "6JdcmJFUauOcjnLMSKQSY"
+uri = "file://attached_assets/stock_images/hero-bakery_1.jpg"
+type = "image"
+title = "artisan baker kneading bread dough bagels fresh baked goods rustic bakery"
+
+[[outputs]]
+id = "MnQkTR0cJ35etBgfWzT1P"
+uri = "file://attached_assets/stock_images/hero-bakery_2.jpg"
+type = "image"
+title = "artisan baker kneading bread dough bagels fresh baked goods rustic bakery"
+
+[[outputs]]
+id = "p7F9BqzVAJUk1V_SVG6R5"
+uri = "file://attached_assets/stock_images/hero-bakery_3.jpg"
+type = "image"
+title = "artisan baker kneading bread dough bagels fresh baked goods rustic bakery"
+
+[[outputs]]
+id = "Zq5VI5765DH35ztzy8ydA"
+uri = "file://attached_assets/stock_images/hero-bakery_4.jpg"
+type = "image"
+title = "artisan baker kneading bread dough bagels fresh baked goods rustic bakery"
+
+[[outputs]]
+id = "PGINojcIA0D6_IJClAM0r"
+uri = "file://attached_assets/stock_images/hero-bakery_5.jpg"
+type = "image"
+title = "artisan baker kneading bread dough bagels fresh baked goods rustic bakery"
