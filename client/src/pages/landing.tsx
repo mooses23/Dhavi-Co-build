@@ -68,13 +68,13 @@ export default function LandingPage() {
                   />
                   {/* Subtle dark overlay for text readability */}
                   <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
-                  {/* Fresh. Daily. text overlay */}
+                  {/* Baked Fresh text overlay */}
                   <div className="absolute top-6 sm:top-10 left-0 right-0 text-center">
                     <h3 
-                      className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight italic drop-shadow-lg"
-                      data-testid="text-hero-fresh-daily"
+                      className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight"
+                      data-testid="text-hero-baked-fresh"
                     >
-                      Fresh. Daily.
+                      Baked Fresh
                     </h3>
                   </div>
                 </div>
