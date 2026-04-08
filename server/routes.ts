@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import rateLimit from "express-rate-limit";
 import { setupSimpleAuth, registerSimpleAuthRoutes, isSimpleAuthenticated } from "./simpleAuth.js";
 import { getStripe } from "./lib/stripe.js";
 import { storage } from "./storage.js";
@@ -61,11 +62,23 @@ import {
 
 import { z } from "zod";
 
+const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many login attempts. Please try again in 15 minutes." },
+  skipSuccessfulRequests: true,
+});
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   await setupSimpleAuth(app);
+
+  app.post("/api/auth/login", loginRateLimiter);
+
   registerSimpleAuthRoutes(app);
 
   // ==========================================
@@ -224,7 +237,8 @@ export async function registerRoutes(
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
-      return res.json({ received: true });
+      console.error("Stripe webhook received but STRIPE_WEBHOOK_SECRET is not configured. Rejecting.");
+      return res.status(400).send("Webhook Error: Webhook secret not configured.");
     }
 
     try {

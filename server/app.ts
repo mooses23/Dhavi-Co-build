@@ -1,4 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
+import helmet from "helmet";
+import cors from "cors";
 import { registerRoutes } from "./routes.js";
 import { createServer } from "http";
 import path from "path";
@@ -6,7 +8,76 @@ import path from "path";
 export const app = express();
 export const httpServer = createServer(app);
 
-// Serve static files from public folder (product images, etc.)
+const isDev = process.env.NODE_ENV !== "production";
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "https://js.stripe.com",
+          "https://replit.com",
+        ],
+        scriptSrcElem: [
+          "'self'",
+          "'unsafe-inline'",
+          "https://js.stripe.com",
+          "https://replit.com",
+        ],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        connectSrc: [
+          "'self'",
+          "https://api.stripe.com",
+          "wss:",
+          "ws:",
+        ],
+        frameSrc: ["https://js.stripe.com", "https://hooks.stripe.com"],
+        fontSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: isDev ? null : [],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    hsts: isDev
+      ? false
+      : {
+          maxAge: 31536000,
+          includeSubDomains: true,
+          preload: true,
+        },
+  })
+);
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : [];
+
+app.use((req, res, next) => {
+  if (req.path === "/api/webhooks/stripe") {
+    return next();
+  }
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (isDev) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      const replitDomain = process.env.REPLIT_DOMAINS;
+      if (replitDomain && origin.endsWith(replitDomain)) return callback(null, true);
+      callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })(req, res, next);
+});
+
 app.use(express.static(path.resolve(process.cwd(), "public")));
 
 declare module "http" {
@@ -17,13 +88,14 @@ declare module "http" {
 
 app.use(
   express.json({
+    limit: "1mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
-  }),
+  })
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -38,23 +110,24 @@ export function log(message: string, source = "express") {
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
+  const reqPath = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+  if (isDev) {
+    const originalResJson = res.json;
+    res.json = function (bodyJson, ...args) {
+      capturedJsonResponse = bodyJson;
+      return originalResJson.apply(res, [bodyJson, ...args]);
+    };
+  }
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
+    if (reqPath.startsWith("/api")) {
+      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
+      if (isDev && capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
       log(logLine);
     }
   });
@@ -66,7 +139,7 @@ let routesInitialized = false;
 
 export async function initializeRoutes() {
   if (routesInitialized) return;
-  
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

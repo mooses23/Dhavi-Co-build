@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { Express, RequestHandler } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -6,11 +7,42 @@ import { getSql } from "./db.js";
 
 const { Pool } = pg;
 
-const VALID_USERNAME = "Dhavi.co";
-const VALID_PASSWORD = "SpeltBagels";
+function getAdminCredentials(): { username: string; password: string } {
+  const username = process.env.ADMIN_USERNAME;
+  const password = process.env.ADMIN_PASSWORD;
 
-if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
-  console.warn("WARNING: SESSION_SECRET not set in production. Using fallback secret.");
+  if (!username || !password) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("ADMIN_USERNAME and ADMIN_PASSWORD environment variables must be set in production.");
+    }
+    console.warn("WARNING: ADMIN_USERNAME or ADMIN_PASSWORD not set. Admin login will be disabled.");
+    return { username: "", password: "" };
+  }
+
+  return { username, password };
+}
+
+function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SESSION_SECRET environment variable must be set in production.");
+    }
+    console.warn("WARNING: SESSION_SECRET not set. Using an insecure default for development only.");
+    return "dev-only-insecure-secret-do-not-use-in-production";
+  }
+  return secret;
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length === 0 && b.length === 0) return true;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
 const PgSession = connectPgSimple(session);
@@ -44,11 +76,11 @@ function getSessionPool(): pg.Pool {
 
 export async function setupSimpleAuth(app: Express) {
   app.set("trust proxy", 1);
-  
+
   try {
     await getSql()`SELECT 1`;
     console.log("Database connection successful");
-    
+
     await getSql()`
       CREATE TABLE IF NOT EXISTS "sessions" (
         "sid" varchar NOT NULL COLLATE "default",
@@ -57,17 +89,17 @@ export async function setupSimpleAuth(app: Express) {
         CONSTRAINT "sessions_pkey" PRIMARY KEY ("sid")
       )
     `;
-    
+
     await getSql()`
       CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "sessions" ("expire")
     `;
-    
+
     console.log("Session table ready");
   } catch (error) {
     console.error("Database setup error:", error);
     throw error;
   }
-  
+
   const sessionStore = new PgSession({
     pool: getSessionPool(),
     tableName: "sessions",
@@ -77,18 +109,18 @@ export async function setupSimpleAuth(app: Express) {
       console.error("Session store error:", error);
     },
   });
-  
+
   app.use(
     session({
       store: sessionStore,
-      secret: process.env.SESSION_SECRET || "dhavi-bakehouse-secret-key-2024",
+      secret: getSessionSecret(),
       resave: false,
       saveUninitialized: false,
       name: "dhavi.sid",
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        maxAge: 24 * 60 * 60 * 1000,
+        maxAge: 8 * 60 * 60 * 1000,
         sameSite: "lax",
       },
     })
@@ -98,64 +130,54 @@ export async function setupSimpleAuth(app: Express) {
 export function registerSimpleAuthRoutes(app: Express) {
   app.post("/api/auth/login", async (req, res) => {
     res.setHeader("Content-Type", "application/json");
-    
+
     try {
       const { username, password } = req.body;
-      
-      console.log("Login attempt for username:", username ? `"${username}"` : "(missing)");
-      console.log("Password provided:", password ? "yes" : "no");
 
       if (!username || !password) {
-        console.log("Login failed: Missing credentials");
         return res.status(400).json({ message: "Username and password are required" });
       }
 
-      console.log("Username match:", username === VALID_USERNAME);
-      console.log("Password match:", password === VALID_PASSWORD);
-      console.log("Expected username:", VALID_USERNAME);
+      const credentials = getAdminCredentials();
 
-      if (username === VALID_USERNAME && password === VALID_PASSWORD) {
-        console.log("Credentials valid, attempting to create session...");
-        
+      const usernameMatch = timingSafeEqual(username, credentials.username);
+      const passwordMatch = timingSafeEqual(password, credentials.password);
+
+      if (usernameMatch && passwordMatch) {
         try {
           req.session.user = {
             username,
             loggedInAt: new Date().toISOString(),
           };
-          
+
           await new Promise<void>((resolve, reject) => {
             req.session.save((err) => {
               if (err) {
                 console.error("Session save error:", err);
                 reject(err);
               } else {
-                console.log("Session saved successfully");
                 resolve();
               }
             });
           });
-          
-          console.log("Login successful");
-          return res.json({ 
+
+          return res.json({
             success: true,
-            user: { username }
+            user: { username },
           });
         } catch (sessionError) {
           console.error("Session error during login:", sessionError);
-          return res.status(500).json({ 
-            message: "Failed to create session. Please try again or contact support."
+          return res.status(500).json({
+            message: "Failed to create session. Please try again or contact support.",
           });
         }
       }
 
-      console.log("Login failed: Invalid credentials");
+      console.warn(`Failed login attempt for username: "${username}" from IP: ${req.ip}`);
       return res.status(401).json({ message: "Invalid username or password" });
     } catch (error) {
-      console.error("Login error (caught at top level):", error);
-      const message = process.env.NODE_ENV === "development" && error instanceof Error
-        ? error.message
-        : "Login failed. Please try again.";
-      return res.status(500).json({ message });
+      console.error("Login error:", error);
+      return res.status(500).json({ message: "Login failed. Please try again." });
     }
   });
 
@@ -180,7 +202,7 @@ export function registerSimpleAuthRoutes(app: Express) {
         path: "/",
         httpOnly: true,
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production"
+        secure: process.env.NODE_ENV === "production",
       });
       return res.json({ success: true });
     });
