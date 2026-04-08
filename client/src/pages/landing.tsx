@@ -66,6 +66,8 @@ export default function LandingPage() {
                     data-testid="img-hero-bakery"
                     className="absolute inset-0 w-full h-full object-cover"
                   />
+                  {/* Subtle vignette overlay for depth */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/10" />
                 </div>
               </div>
             </div>
