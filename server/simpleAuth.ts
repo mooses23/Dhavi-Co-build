@@ -4,6 +4,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import pg from "pg";
 import { getSql } from "./db.js";
+import { storage } from "./storage.js";
 
 const { Pool } = pg;
 
@@ -47,11 +48,15 @@ function timingSafeEqual(a: string, b: string): boolean {
 
 const PgSession = connectPgSimple(session);
 
+const SESSION_ABSOLUTE_TTL_MS = 8 * 60 * 60 * 1000;
+const SESSION_IDLE_TTL_MS = 2 * 60 * 60 * 1000;
+
 declare module "express-session" {
   interface SessionData {
     user?: {
       username: string;
       loggedInAt: string;
+      lastActivityAt: string;
     };
   }
 }
@@ -120,11 +125,39 @@ export async function setupSimpleAuth(app: Express) {
       cookie: {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
-        maxAge: 8 * 60 * 60 * 1000,
+        maxAge: SESSION_ABSOLUTE_TTL_MS,
         sameSite: "lax",
       },
     })
   );
+
+  app.use((req, res, next) => {
+    if (!req.session.user) return next();
+
+    const now = Date.now();
+    const loggedInAt = new Date(req.session.user.loggedInAt).getTime();
+    const lastActivityAt = new Date(req.session.user.lastActivityAt).getTime();
+
+    const absoluteExpired = now - loggedInAt > SESSION_ABSOLUTE_TTL_MS;
+    const idleExpired = now - lastActivityAt > SESSION_IDLE_TTL_MS;
+
+    if (absoluteExpired || idleExpired) {
+      req.session.destroy((err) => {
+        if (err) console.error("Session destroy error:", err);
+        res.clearCookie("dhavi.sid", {
+          path: "/",
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+        });
+        return res.status(401).json({ message: "Session expired. Please log in again." });
+      });
+      return;
+    }
+
+    req.session.user.lastActivityAt = new Date().toISOString();
+    next();
+  });
 }
 
 export function registerSimpleAuthRoutes(app: Express) {
@@ -145,9 +178,11 @@ export function registerSimpleAuthRoutes(app: Express) {
 
       if (usernameMatch && passwordMatch) {
         try {
+          const now = new Date().toISOString();
           req.session.user = {
             username,
-            loggedInAt: new Date().toISOString(),
+            loggedInAt: now,
+            lastActivityAt: now,
           };
 
           await new Promise<void>((resolve, reject) => {
@@ -174,6 +209,14 @@ export function registerSimpleAuthRoutes(app: Express) {
       }
 
       console.warn(`Failed login attempt for username: "${username}" from IP: ${req.ip}`);
+      storage.logActivity(
+        "auth.login_failed",
+        "auth",
+        undefined,
+        { username, ip: req.ip, userAgent: req.headers["user-agent"] ?? null },
+        undefined,
+        "system"
+      ).catch((err) => console.error("Failed to log failed login attempt:", err));
       return res.status(401).json({ message: "Invalid username or password" });
     } catch (error) {
       console.error("Login error:", error);

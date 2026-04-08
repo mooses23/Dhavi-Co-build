@@ -55,9 +55,30 @@ app.use(
   })
 );
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-  : [];
+function buildTrustedOrigins(): Set<string> {
+  const origins = new Set<string>();
+
+  if (process.env.ALLOWED_ORIGINS) {
+    for (const o of process.env.ALLOWED_ORIGINS.split(",")) {
+      const trimmed = o.trim();
+      if (trimmed) origins.add(trimmed);
+    }
+  }
+
+  if (process.env.REPLIT_DOMAINS) {
+    for (const domain of process.env.REPLIT_DOMAINS.split(",")) {
+      const d = domain.trim();
+      if (d) {
+        origins.add(`https://${d}`);
+        origins.add(`http://${d}`);
+      }
+    }
+  }
+
+  return origins;
+}
+
+const trustedOrigins = buildTrustedOrigins();
 
 app.use((req, res, next) => {
   if (req.path === "/api/webhooks/stripe") {
@@ -67,9 +88,7 @@ app.use((req, res, next) => {
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (isDev) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      const replitDomain = process.env.REPLIT_DOMAINS;
-      if (replitDomain && origin.endsWith(replitDomain)) return callback(null, true);
+      if (trustedOrigins.has(origin)) return callback(null, true);
       callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
