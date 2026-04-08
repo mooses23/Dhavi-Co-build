@@ -44,6 +44,7 @@ app.use(
         upgradeInsecureRequests: isDev ? null : [],
       },
     },
+    xFrameOptions: { action: "deny" },
     crossOriginEmbedderPolicy: false,
     hsts: isDev
       ? false
