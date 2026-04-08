@@ -66,8 +66,8 @@ export default function LandingPage() {
                     data-testid="img-hero-bakery"
                     className="absolute inset-0 w-full h-full object-cover"
                   />
-                  {/* Subtle dark overlay for text readability */}
-                  <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
+                  {/* Dark overlay to mask baked-in image text and support readability */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/20 to-transparent" />
                   {/* Baked Fresh text overlay */}
                   <div className="absolute top-6 sm:top-10 left-0 right-0 text-center">
                     <h3 
