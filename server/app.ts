@@ -90,6 +90,11 @@ app.use((req, res, next) => {
       if (!origin) return callback(null, true);
       if (isDev) return callback(null, true);
       if (trustedOrigins.has(origin)) return callback(null, true);
+      const host = req.headers.host;
+      if (host && (origin === `https://${host}` || origin === `http://${host}`)) {
+        return callback(null, true);
+      }
+      console.warn(`CORS blocked origin: "${origin}" (host: "${host}")`);
       callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
