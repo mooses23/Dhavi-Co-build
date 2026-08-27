@@ -328,12 +328,12 @@ ON CONFLICT ("id") DO UPDATE SET
 
 -- Insert sample products (bagel varieties)
 INSERT INTO "products" ("id", "name", "description", "price", "is_active") VALUES
-  ('prod-plain', 'Plain Spelt Bagel', 'Classic spelt bagel with a perfect chewy texture', 3.50, true),
-  ('prod-everything', 'Everything Spelt Bagel', 'Topped with sesame, poppy, onion, garlic, and salt', 4.00, true),
-  ('prod-sesame', 'Sesame Spelt Bagel', 'Generously coated with toasted sesame seeds', 3.75, true),
-  ('prod-poppy', 'Poppy Seed Spelt Bagel', 'Classic poppy seed topping on spelt dough', 3.75, true),
-  ('prod-cinnamon', 'Cinnamon Raisin Spelt Bagel', 'Sweet cinnamon swirl with golden raisins', 4.25, true),
-  ('prod-onion', 'Onion Spelt Bagel', 'Savory dried onion topping', 3.75, true)
+  ('prod-plain', 'Plain Spelt Bagel', 'Classic spelt bagel with a perfect chewy texture', 5.00, true),
+  ('prod-everything', 'Everything Spelt Bagel', 'Topped with sesame, poppy, onion, garlic, and salt', 5.00, true),
+  ('prod-sesame', 'Sesame Spelt Bagel', 'Generously coated with toasted sesame seeds', 5.00, true),
+  ('prod-poppy', 'Poppy Seed Spelt Bagel', 'Classic poppy seed topping on spelt dough', 5.00, true),
+  ('prod-cinnamon', 'Cinnamon Raisin Spelt Bagel', 'Sweet cinnamon swirl with golden raisins', 5.00, true),
+  ('prod-onion', 'Onion Spelt Bagel', 'Savory dried onion topping', 5.00, true)
 ON CONFLICT ("id") DO UPDATE SET 
   "name" = EXCLUDED."name",
   "description" = EXCLUDED."description",

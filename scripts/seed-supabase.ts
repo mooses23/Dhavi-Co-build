@@ -80,9 +80,9 @@ async function seed() {
     await sql`
       INSERT INTO products (id, name, description, price, image_url, is_active)
       VALUES 
-        ('prod-plain', 'Plain Spelt Bagel', 'Classic spelt bagel with a perfect chewy texture', 3.50, '/images/bagel-plain.jpg', true),
-        ('prod-everything', 'Everything Spiced Bagel', 'Topped with sesame, poppy, onion, garlic, and salt', 4.00, '/images/bagel-everything.jpg', true),
-        ('prod-sesame', 'Sesame Spelt Bagel', 'Generously coated with toasted sesame seeds', 3.75, '/images/bagel-sesame.jpg', true)
+        ('prod-plain', 'Plain Spelt Bagel', 'Classic spelt bagel with a perfect chewy texture', 5.00, '/images/bagel-plain.jpg', true),
+        ('prod-everything', 'Everything Spiced Bagel', 'Topped with sesame, poppy, onion, garlic, and salt', 5.00, '/images/bagel-everything.jpg', true),
+        ('prod-sesame', 'Sesame Spelt Bagel', 'Generously coated with toasted sesame seeds', 5.00, '/images/bagel-sesame.jpg', true)
       ON CONFLICT (id) DO UPDATE SET 
         name = EXCLUDED.name,
         description = EXCLUDED.description,
